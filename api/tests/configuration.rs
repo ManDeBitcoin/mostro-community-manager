@@ -25,6 +25,16 @@ fn rejects_unsafe_and_ambiguous_settings() {
     c = config();
     c.community.website = "javascript:alert(1)".into();
     assert!(c.validate().is_err());
+    // Apps load the picture from pages served over HTTPS.
+    for picture in [
+        "http://comunidad.example/logo.png",
+        "https://user:secret@comunidad.example/logo.png",
+        "logo.png",
+    ] {
+        c = config();
+        c.community.picture = picture.into();
+        assert!(c.validate().is_err(), "{picture}");
+    }
     c = config();
     c.payment_methods.push(c.payment_methods[0].clone());
     assert!(c.validate().is_err());
@@ -237,6 +247,7 @@ fn optional_metadata_is_rendered_only_when_present() {
     let mut c = config();
     c.community.website = "https://comunidad.example".into();
     c.community.about = "  ".into();
+    assert!(c.community.picture.is_empty());
     let rendered = render_settings(
         &c,
         "https://lnd:10009",
@@ -250,10 +261,37 @@ fn optional_metadata_is_rendered_only_when_present() {
         Some("https://comunidad.example")
     );
     assert!(doc["mostro"].get("about").is_none());
+    assert!(doc["mostro"].get("picture").is_none());
     assert_eq!(
         doc["mostro"]["name"].as_str(),
         Some(c.community.name.as_str())
     );
+
+    c.community.picture = " https://comunidad.example/logo.png ".into();
+    assert!(c.validate().is_ok());
+    let rendered = render_settings(
+        &c,
+        "https://lnd:10009",
+        "/lnd/tls.cert",
+        "/lnd/admin.macaroon",
+    )
+    .unwrap();
+    let doc: toml::Value = toml::from_str(&rendered).unwrap();
+    assert_eq!(
+        doc["mostro"]["picture"].as_str(),
+        Some("https://comunidad.example/logo.png")
+    );
+}
+
+/// Rules saved before the picture existed have no `picture` key and still open.
+#[test]
+fn rules_saved_without_a_picture_still_open() {
+    let stored: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/community.json")).unwrap();
+    assert!(stored["community"].get("picture").is_none());
+    let c = config();
+    assert!(c.community.picture.is_empty());
+    assert!(c.validate().is_ok());
 }
 
 #[test]

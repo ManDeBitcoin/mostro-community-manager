@@ -299,7 +299,7 @@ fn same_settings(on_disk: &[u8], rendered: &str) -> bool {
     fn parsed(text: &str) -> Option<toml::Value> {
         let mut doc: toml::Value = toml::from_str(text).ok()?;
         if let Some(mostro) = doc.get_mut("mostro").and_then(toml::Value::as_table_mut) {
-            for key in ["name", "about", "website"] {
+            for key in ["name", "about", "website", "picture"] {
                 let Some(value) = mostro.get(key).and_then(toml::Value::as_str) else {
                     continue;
                 };

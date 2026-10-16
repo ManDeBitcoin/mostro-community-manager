@@ -178,6 +178,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 name: String::new(),
                 about: String::new(),
                 website: String::new(),
+                picture: String::new(),
                 contact: String::new(),
                 language: "es".into(),
             },

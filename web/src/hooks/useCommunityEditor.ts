@@ -157,6 +157,10 @@ export function useCommunityEditor(onSaved: () => void | Promise<void>) {
       try { const contactUrl = new URL(draft.community.contact); if (!['http:', 'https:'].includes(contactUrl.protocol)) throw new Error(); }
       catch { setSaving(false); setError('El contacto debe ser una URL que empiece con http:// o https://.'); return; }
     }
+    if (draft.community.picture.trim()) {
+      try { if (new URL(draft.community.picture.trim()).protocol !== 'https:') throw new Error(); }
+      catch { setSaving(false); setError('La imagen de la comunidad debe ser una URL que empiece con https://.'); return; }
+    }
     try {
       const response = await api<CommunityReply>('/api/community', { method: 'PUT', body: JSON.stringify({ revision, config: draft }) });
       const config = response.config || draft;

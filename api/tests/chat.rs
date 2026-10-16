@@ -60,6 +60,7 @@ fn valid_config(relays: Vec<String>) -> Configuration {
             name: "Test Community".into(),
             about: "Testing chat".into(),
             website: "https://community.test".into(),
+            picture: String::new(),
             contact: "https://contact.test".into(),
             language: "es".into(),
         },

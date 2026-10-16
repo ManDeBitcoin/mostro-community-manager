@@ -20,6 +20,10 @@ pub struct Community {
     pub name: String,
     pub about: String,
     pub website: String,
+    /// HTTPS address of a square image that apps show as the node's avatar
+    /// (kind 0 `picture`). Configurations saved before it existed have none.
+    #[serde(default)]
+    pub picture: String,
     pub contact: String,
     pub language: String,
 }
@@ -90,6 +94,9 @@ impl Configuration {
             .any(|v| v.len() > 2048 || (!v.is_empty() && !valid_url(v, &["https", "http"])))
         {
             return Err("Usa enlaces HTTP(S) sin credenciales");
+        }
+        if c.picture.len() > 2048 || (!c.picture.is_empty() && !valid_url(&c.picture, &["https"])) {
+            return Err("La imagen de la comunidad debe ser un enlace HTTPS sin credenciales");
         }
         let m = &self.market;
         if m.min_trade_sats == 0
@@ -276,6 +283,7 @@ pub fn render_settings(
         ("name", &config.community.name),
         ("about", &config.community.about),
         ("website", &config.community.website),
+        ("picture", &config.community.picture),
     ] {
         let value = value.trim();
         if !value.is_empty() {
@@ -349,6 +357,7 @@ pub fn get_regional_presets() -> Vec<RegionalPreset> {
                     name: "Mostro P2P Latam".into(),
                     about: "Comunidad de intercambio P2P de Bitcoin Lightning para Latinoamérica.".into(),
                     website: "https://mostro.network".into(),
+                    picture: String::new(),
                     contact: "https://t.me/MostroP2P".into(),
                     language: "es".into(),
                 },
@@ -429,6 +438,7 @@ pub fn get_regional_presets() -> Vec<RegionalPreset> {
                     name: "Mostro P2P Europe".into(),
                     about: "Bitcoin Lightning P2P community for Europe & SEPA zone.".into(),
                     website: "https://mostro.network".into(),
+                    picture: String::new(),
                     contact: "https://t.me/MostroP2P".into(),
                     language: "en".into(),
                 },
@@ -500,6 +510,7 @@ pub fn get_regional_presets() -> Vec<RegionalPreset> {
                     name: "Mostro P2P Global".into(),
                     about: "Global peer-to-peer Bitcoin Lightning exchange community.".into(),
                     website: "https://mostro.network".into(),
+                    picture: String::new(),
                     contact: "https://t.me/MostroP2P".into(),
                     language: "en".into(),
                 },

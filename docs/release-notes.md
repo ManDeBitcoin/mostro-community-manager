@@ -1,3 +1,10 @@
+# Mostro Community Manager v1.0.15
+
+- Nuevo en Configuración, Identidad de la comunidad: **Imagen de la comunidad**. Es el enlace a una imagen cuadrada (se recomienda 128x128 px) que el daemon publica en el perfil del nodo en Nostr (evento kind 0, campo `picture`). Las apps de Mostro la muestran junto al nombre del nodo, por ejemplo al elegir comunidad.
+- Solo admite enlaces `https://` sin credenciales. Si la dejas vacía no se publica ninguna imagen, como hasta ahora.
+- Las reglas guardadas con una versión anterior se abren igual, sin imagen. Guardar una imagen nueva reinicia el daemon, que publica el perfil actualizado al arrancar.
+- Sigue incluyendo el daemon Mostro v0.20.0. La actualización no requiere migración de base de datos ni cambios de configuración.
+
 # Mostro Community Manager v1.0.14
 
 - Incluye el daemon oficial Mostro v0.20.0 (antes v0.19.2), comprobado por SHA-256 para amd64 y arm64. Las firmas del manifiesto de la release, de grunch y arkanoider, se verificaron.

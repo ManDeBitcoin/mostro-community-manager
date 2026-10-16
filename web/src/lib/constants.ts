@@ -45,7 +45,7 @@ export const COMMISSION_BOND_PRESETS: CommissionBondPreset[] = [
 export const POPULAR_CURRENCIES = ['USD', 'EUR', 'ARS', 'VES', 'COP', 'BRL', 'MXN', 'CLP', 'PEN', 'GBP', 'CHF'];
 
 export const blankConfig = (): Configuration => ({
-  community: { name: '', about: '', website: '', contact: '', language: 'es' },
+  community: { name: '', about: '', website: '', picture: '', contact: '', language: 'es' },
   market: { fiat_currencies: [], min_trade_sats: 1000, max_trade_sats: 1000000, fee_bps: 0, dev_fee_bps: 3000, max_routing_fee_bps: 20 },
   safety: { bond_enabled: false, bond_bps: 0, base_bond_sats: 0, bond_apply_to: 'both', automatic_timeout_slash: false, pow: 0, pow_first_contact: 0 },
   nostr: { relays: [] },

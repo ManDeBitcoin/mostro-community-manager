@@ -1,6 +1,6 @@
 // Shapes of the API responses the panel reads.
 export type Configuration = {
-  community: { name: string; about: string; website: string; contact: string; language: string };
+  community: { name: string; about: string; website: string; picture: string; contact: string; language: string };
   market: { fiat_currencies: string[]; min_trade_sats: number; max_trade_sats: number; fee_bps: number; dev_fee_bps: number; max_routing_fee_bps: number };
   safety: { bond_enabled: boolean; bond_bps: number; base_bond_sats: number; bond_apply_to: 'make' | 'take' | 'both'; automatic_timeout_slash: boolean; pow: number; pow_first_contact: number };
   nostr: { relays: string[] };

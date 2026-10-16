@@ -9,6 +9,7 @@ fn sample_config() -> Configuration {
             name: "Comunidad Regtest".into(),
             about: "Comunidad de prueba para simulación P2P".into(),
             website: "https://comunidad.test".into(),
+            picture: String::new(),
             contact: "https://t.me/mostro_test".into(),
             language: "es".into(),
         },

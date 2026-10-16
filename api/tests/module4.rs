@@ -19,6 +19,7 @@ fn dummy_config(relays: Vec<String>) -> Configuration {
             name: "Modulo 4 Test Community".into(),
             about: "Testing module 4 notifications and backup".into(),
             website: "https://community.test".into(),
+            picture: String::new(),
             contact: "https://contact.test".into(),
             language: "es".into(),
         },
