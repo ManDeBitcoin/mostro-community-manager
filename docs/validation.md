@@ -475,3 +475,24 @@ La revisión previa a v1.0.12 dejó nueve hallazgos abiertos que nadie había co
 
 - En la puesta en marcha, el paso del respaldo figura como pendiente mientras el estado de los respaldos aún no se ha leído. Es anterior a estos cambios y no se ha tocado.
 - El monitor no comprueba la etiqueta `d` del evento de información del nodo, y la tarjeta puede firmarse con un relay cuyo esquema está en mayúsculas, que la app descarta antes de verificar. Los dos proceden de la verificación de la guía de integración y no formaban parte de esta lista.
+
+## Mostro v0.20.0 (2026-10-16)
+
+Validación previa a la versión 1.0.14. El nodo en producción no se tocó. No se repitió el ciclo completo en regtest de la v0.19.2.
+
+### Binario
+
+- Binarios oficiales `mostrod` v0.20.0 descargados de la release de GitHub. SHA-256 coincidentes con `manifest.txt`: amd64 `078c2f1a2f0d9a3e438e5d363480c79a19931664ceb36be0661155f73171bc86`, arm64 `f82fe9e7f09e727851a8fcbf107d4c266abdb1ee47f7092dba116f891ccce1f6`.
+- Firmas GPG de `manifest.txt` válidas con las claves `1E41631D137BA2ADE55344F73852B843679AD6F0` (negrunch) y `2E986CA1C5E7EA1635CD059C4989CC7415A43AEC` (arkanoider), descargadas del tag v0.20.0. La release no trae firma de catrya. Las claves no están certificadas por una cadena de confianza propia.
+- El binario amd64 responde `mostro p2p 0.20.0`. El de arm64 no se ejecutó.
+
+### Configuración y base de datos
+
+- La plantilla de v0.20.0 frente a la de v0.19.0 (la que compila el Manager): solo cambia en bloques comentados y en la sección nueva `[health]`. En el código de v0.20.0, `Settings::health` lleva `#[serde(default)]` y sus valores por defecto son los de la plantilla, así que omitirla es equivalente. `admin.proto` solo añade `RevokeReputationImports`.
+- El `settings.toml` de producción, con una clave desechable, LND y relays inalcanzables y sin red, cargado por el binario v0.20.0: `Settings correctly loaded!`, base de datos creada con todas las migraciones y `Transport: nip44 (protocol v2, event kind 14)`. Se detiene, como se espera, al no poder conectar con LND. La validación nueva de `escrow_deadline_margin_blocks` (24, con `hold_invoice_cltv_delta` 144) pasa.
+- Copia de la base de datos de producción (6 órdenes, 15 migraciones) abierta con v0.20.0 sin red: se aplican las 9 migraciones nuevas (24 en total, ninguna fallida) y las 6 órdenes siguen.
+- La misma copia, ya migrada, abierta con v0.19.2: el daemon no arranca (`migration 20261002120000 was previously applied but is missing in the resolved migrations`). Volver a la 1.0.13 exige restaurar un respaldo previo a la actualización.
+
+### Protocolo
+
+- mostro-core 0.17.3 (el que usa v0.20.0) define las mismas seis variantes de mensaje que la 0.16.0. La consola de mediación acepta cualquier nombre de acción, así que las acciones nuevas se muestran sin cambios en el Manager.

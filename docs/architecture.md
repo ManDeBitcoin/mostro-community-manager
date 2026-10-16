@@ -1,6 +1,6 @@
 # Decisiones y compatibilidad — primera iteración
 
-> Documento de la primera iteración, conservado como registro de decisiones. La versión de Mostro fijada hoy es la v0.19.2: ver `config/versions.json` y `config/upstream/README.md`. El contrato con las apps cliente está en [INTEGRACION-APPS.md](INTEGRACION-APPS.md).
+> Documento de la primera iteración, conservado como registro de decisiones. La versión de Mostro fijada hoy es la v0.20.0: ver `config/versions.json` y `config/upstream/README.md`. El contrato con las apps cliente está en [INTEGRACION-APPS.md](INTEGRACION-APPS.md).
 
 El blueprint adjunto es referencia de producto. Esta entrega implementa una parte de las fases 0–1; no constituye el MVP completo ni una instalación validada en Umbrel.
 

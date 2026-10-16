@@ -224,10 +224,11 @@ pub const MIN_DEV_FEE_BPS: u16 = 1_000;
 
 /// Upstream `settings.tpl.toml` the renderer starts from.
 ///
-/// The embedded file is the v0.19.0 template. For mostrod v0.19.2 it yields
-/// the same settings: upstream only added a commented-out `serbero_pubkey`
-/// block, and `api/tests/configuration.rs` fails if the two ever differ once
-/// parsed. The v0.19.2 copy in `config/upstream` is GPL-3.0-or-later like the
+/// The embedded file is the v0.19.0 template. For mostrod v0.20.0 it yields
+/// the same settings: upstream added commented-out blocks and a `[health]`
+/// section whose absence mostrod reads as the same defaults, and
+/// `api/tests/configuration.rs` fails if the two ever differ otherwise once
+/// parsed. The v0.20.0 copy in `config/upstream` is GPL-3.0-or-later like the
 /// rest of that release, so it is kept as a reference and not compiled in.
 const SETTINGS_TEMPLATE: &str = include_str!("../../config/upstream/settings.v0.19.0.toml");
 

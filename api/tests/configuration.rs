@@ -148,21 +148,46 @@ fn corrupt_persistence_fails_closed() {
 }
 
 /// The renderer embeds the v0.19.0 template (MIT). It is valid for the pinned
-/// mostrod v0.19.2 as long as both templates describe the same settings: this
-/// fails the day upstream adds, removes or changes a default, so the embedded
-/// template cannot silently fall behind the daemon that is shipped.
+/// mostrod v0.20.0 as long as both templates describe the same settings, but
+/// for the `[health]` section v0.20.0 added. The renderer leaves it out, and
+/// mostrod reads an absent `[health]` as its defaults (`#[serde(default)]` on
+/// `Settings::health`), which are the values the v0.20.0 template lists. This
+/// fails the day upstream adds, removes or changes anything else, or changes
+/// those defaults, so the embedded template cannot silently fall behind the
+/// daemon that is shipped.
 #[test]
 fn embedded_template_is_equivalent_to_the_pinned_upstream_release() {
     let embedded: toml::Value =
         toml::from_str(include_str!("../../config/upstream/settings.v0.19.0.toml")).unwrap();
-    let pinned: toml::Value =
-        toml::from_str(include_str!("../../config/upstream/settings.v0.19.2.toml")).unwrap();
+    let mut pinned: toml::Value =
+        toml::from_str(include_str!("../../config/upstream/settings.v0.20.0.toml")).unwrap();
+    let health = pinned
+        .as_table_mut()
+        .unwrap()
+        .remove("health")
+        .expect("v0.20.0 lists [health]");
+    let health_defaults: toml::Value = toml::from_str(
+        r#"
+        enabled = true
+        interval = 60
+        watchdog_pubkey = ""
+        lnd_unsynced_fail_after = 600
+        auto_maintenance_on_lnd_unsynced = true
+        lnd_resynced_clear_after = 300
+        "#,
+    )
+    .unwrap();
+    assert_eq!(health, health_defaults);
+    assert!(embedded.get("health").is_none());
     assert_eq!(embedded, pinned);
 
-    // Same for the admin gRPC contract the API is compiled against.
+    // The admin gRPC contract the API is compiled against (it calls only
+    // GetVersion): v0.20.0 adds RevokeReputationImports and nothing else.
     assert_eq!(
-        include_str!("../../config/upstream/admin.v0.19.0.proto"),
-        include_str!("../../config/upstream/admin.v0.19.2.proto")
+        proto_lines(include_str!("../../config/upstream/admin.v0.19.0.proto")),
+        proto_lines(&without_reputation_revocation(include_str!(
+            "../../config/upstream/admin.v0.20.0.proto"
+        )))
     );
 
     // The pin recorded for packaging matches the constant the API reports.
@@ -176,6 +201,35 @@ fn embedded_template_is_equivalent_to_the_pinned_upstream_release() {
         versions["mostro"]["tag"],
         format!("v{}", mostro_community_api::daemon::MOSTRO_VERSION)
     );
+}
+
+/// Non-blank lines of a .proto file, so blank-line spacing does not count.
+fn proto_lines(proto: &str) -> Vec<&str> {
+    proto.lines().filter(|l| !l.trim().is_empty()).collect()
+}
+
+/// The admin contract without the RevokeReputationImports RPC (and the
+/// comment above it) or its two messages, all new in mostrod v0.20.0.
+fn without_reputation_revocation(proto: &str) -> String {
+    let mut kept: Vec<&str> = Vec::new();
+    let mut in_message = false;
+    for line in proto.lines() {
+        if in_message {
+            in_message = line != "}";
+        } else if line.starts_with("message RevokeReputationImports") {
+            in_message = true;
+        } else if line.contains("rpc RevokeReputationImports(") {
+            while kept
+                .last()
+                .is_some_and(|l| l.trim_start().starts_with("//"))
+            {
+                kept.pop();
+            }
+        } else {
+            kept.push(line);
+        }
+    }
+    kept.join("\n")
 }
 
 #[test]

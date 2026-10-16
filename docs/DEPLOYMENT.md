@@ -2,7 +2,7 @@
 
 > **Versión:** 1.0.0 (Producción)  
 > **Compatibilidad:** Umbrel OS v0.5+ / UmbrelOS 1.x  
-> **Protocolo:** Mostro v0.19.2, protocolo 2 (mensajes kind 14 con cifrado NIP-44) / Lightning Network (LND)
+> **Protocolo:** Mostro v0.20.0, protocolo 2 (mensajes kind 14 con cifrado NIP-44) / Lightning Network (LND)
 
 ---
 
@@ -11,7 +11,7 @@
 **Mostro Community Manager** permite a cualquier operador con un nodo Umbrel desplegar y administrar una comunidad P2P de intercambio soberano de Bitcoin sin necesidad de programar, bifurcar software ni mantener clientes móviles propios.
 
 - **Compradores y Vendedores:** Utilizan la **Mostro App oficial** (disponible para Android, iOS y Web) conectándose directamente a tu nodo mediante la identidad pública (`npub` / `nprofile`) y los relays Nostr que configures.
-- **Motor de Mercado:** Ejecuta el daemon oficial de **Mostro** (v0.19.2) orquestado de forma aislada.
+- **Motor de Mercado:** Ejecuta el daemon oficial de **Mostro** (v0.20.0) orquestado de forma aislada.
 - **Canal Financiero:** Se conecta al nodo **LND** de tu Umbrel mediante permisos mínimos de solo lectura (`readonly.macaroon`) para la interfaz administrativa, y credenciales seguras para el daemon de pagos.
 - **Panel de Control:** Servido mediante una API en Rust de alto rendimiento y una interfaz web en React con soporte para monitor de órdenes, consola de mediación cifrada, gestión de liquidez Lightning, alertas en vivo y respaldos cifrados.
 
@@ -32,7 +32,7 @@ USUARIOS (Mostro App)
 │  │    ├── Transmisión de alertas en vivo (SSE)         │
 │  │    └── Respaldos cifrados (age)                     │
 │  │                                                     │
-│  ├── Daemon Mostro (v0.19.2) [Orquestación Atómica]    │
+│  ├── Daemon Mostro (v0.20.0) [Orquestación Atómica]    │
 │  │                                                     │
 │  ├── LND (Lightning Node)                              │
 │  └── Bitcoin Core Node                                 │
