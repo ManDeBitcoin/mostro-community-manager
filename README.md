@@ -2,7 +2,7 @@
 
 <img src="assets/logo.png" alt="Mostro Community Manager" width="720">
 
-Panel de operador para configurar una comunidad P2P sobre Mostro y Lightning, activar el daemon y supervisar órdenes, liquidez y mediación. **Versión del manifiesto de Umbrel: 1.0.14.**
+Panel de operador para configurar una comunidad P2P sobre Mostro y Lightning, activar el daemon y supervisar órdenes, liquidez y mediación. **Versión del manifiesto de Umbrel: 1.0.15.**
 
 ## Instalar en Umbrel
 
@@ -11,7 +11,7 @@ Este repositorio también es una tienda comunitaria de una sola aplicación.
 1. En Umbrel, abrir **App Store → Community App Stores / Tiendas comunitarias**.
 2. Añadir `https://github.com/ManDeBitcoin/mostro-community-umbrel`.
 3. Instalar **Mostro Community Manager**.
-4. Comprobar que la ficha muestre **1.0.14** y abrirlo desde Umbrel.
+4. Comprobar que la ficha muestre **1.0.15** y abrirlo desde Umbrel.
 
 ID estable de la aplicación: `mandebitcoin-mostro-manager`. Puerto del panel: `5173`, gestionado por `app_proxy`. No configurar un proxy público directo al contenedor. Datos exclusivos en `${APP_DATA_DIR}/data/config`.
 
