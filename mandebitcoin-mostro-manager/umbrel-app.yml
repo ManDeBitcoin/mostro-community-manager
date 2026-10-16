@@ -4,7 +4,7 @@ name: Mostro Community Manager
 tagline: Administra tu comunidad P2P soberana sobre Mostro y Lightning
 icon: https://raw.githubusercontent.com/ManDeBitcoin/mostro-community-umbrel/main/assets/icon.png
 category: bitcoin
-version: 1.0.13
+version: 1.0.14
 port: 5173
 description: >-
   Mostro Community Manager es la plataforma nativa para Umbrel diseñada para que
@@ -42,7 +42,20 @@ path: ""
 defaultUsername: ""
 defaultPassword: ""
 releaseNotes: |-
-  Versión 1.0.13
+  Versión 1.0.14
+  
+  - Incluye el daemon oficial Mostro v0.20.0 (antes v0.19.2), comprobado por SHA-256 para amd64 y arm64. Las firmas del manifiesto de la release, de grunch y arkanoider, se verificaron.
+  - **Haz un respaldo antes de actualizar.** Al primer arranque el daemon aplica nueve migraciones a su base de datos. El daemon v0.19.2 de la 1.0.13 no arranca sobre una base ya migrada: volver a la 1.0.13 exige restaurar el respaldo hecho antes de actualizar.
+  - Actualiza sin órdenes abiertas.
+  - Nuevo en el daemon: publica cada minuto un evento de salud (kind 38389) que dice si el nodo funciona (LND sincronizado, pagos a compradores, relays, base de datos). El Manager no configura un vigilante (`watchdog_pubkey`), así que solo salen las etiquetas públicas generales, sin métricas detalladas.
+  - Nuevo en el daemon: si LND deja de estar sincronizado durante diez minutos seguidos, el daemon entra solo en modo mantenimiento con el motivo `lnd_unsynced`: no acepta órdenes nuevas ni tomas, y las operaciones abiertas pueden terminar. Sale solo tras cinco minutos con LND sincronizado. Un modo mantenimiento puesto a mano nunca lo levanta el daemon.
+  - Nuevo en el daemon: los pagos salientes (al comprador, el aporte al desarrollo y las devoluciones de garantía) esperan mientras LND no está sincronizado, sin gastar los intentos del comprador. Un pago del aporte al desarrollo que falla se reintenta cada vez más espaciado, por orden.
+  - El daemon comprueba al arrancar que `escrow_deadline_margin_blocks` sea al menos 18 y menor que `hold_invoice_cltv_delta`. Los valores que genera el Manager (24 y 144) cumplen.
+  - La importación de reputación de v0.20.0 queda desactivada: el Manager no la configura.
+  - El panel todavía no muestra el evento de salud.
+  - La configuración que genera el Manager no cambia.
+  
+  # Mostro Community Manager v1.0.13
   
   - Nuevo en **Conexión de apps**: el panel puede publicar la tarjeta firmada de la comunidad en los relays del nodo. Una app preparada para ello encuentra sola los métodos de pago, la moneda, la web y el contacto, sin código ni enlace.
   - La opción nace apagada y pide confirmación al encenderla: deja esos datos a la vista de cualquiera que consulte los relays, ligados a la clave del nodo. El panel lo explica antes de publicar nada.

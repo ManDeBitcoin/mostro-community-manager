@@ -8,7 +8,7 @@ services:
       - default
       - manager_private
   init:
-    image: ghcr.io/mandebitcoin/mostro-community-umbrel:1.0.13
+    image: ghcr.io/mandebitcoin/mostro-community-umbrel:1.0.14
     user: "0:0"
     entrypoint: ["/bin/sh", "-c"]
     command: ["mkdir -p /data/config /data/backup && chown -R 1000:1000 /data && chmod 700 /data/config /data/backup"]
@@ -20,7 +20,7 @@ services:
     cap_add: [CHOWN, FOWNER, DAC_OVERRIDE]
     security_opt: ["no-new-privileges:true"]
   lnd_bridge:
-    image: ghcr.io/mandebitcoin/mostro-community-umbrel:1.0.13
+    image: ghcr.io/mandebitcoin/mostro-community-umbrel:1.0.14
     entrypoint: ["mostro-community-api", "lnd-tunnel"]
     healthcheck:
       disable: true
@@ -34,7 +34,7 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
   web:
-    image: ghcr.io/mandebitcoin/mostro-community-umbrel:1.0.13
+    image: ghcr.io/mandebitcoin/mostro-community-umbrel:1.0.14
     user: "1000:1000"
     restart: on-failure
     depends_on:
@@ -68,7 +68,7 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
   mostro:
-    image: ghcr.io/mandebitcoin/mostro-community-umbrel:1.0.13
+    image: ghcr.io/mandebitcoin/mostro-community-umbrel:1.0.14
     entrypoint: ["/bin/sh", "/usr/local/bin/mostro-entrypoint"]
     user: "1000:1000"
     restart: on-failure
