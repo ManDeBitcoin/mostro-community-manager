@@ -131,6 +131,10 @@ pub struct DaemonReport {
     pub announced_before_start: bool,
     #[serde(default)]
     pub last_exit: Option<LastExit>,
+    /// Orders not finished in the daemon's database: an update or a restart
+    /// should wait while any is in flight. `None` without a database.
+    #[serde(default)]
+    pub open_orders: Option<crate::mostro_db::OpenOrders>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -578,7 +582,10 @@ pub async fn report_with_node_info(
         None => (packaged_version.clone(), packaged_source),
     };
 
+    let open_orders = crate::mostro_db::open_orders(&crate::mostro_db::database_path(root)).ok();
+
     DaemonReport {
+        open_orders,
         state,
         identity_present,
         npub,

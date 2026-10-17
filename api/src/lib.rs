@@ -8,6 +8,7 @@ pub mod daemon;
 pub mod http;
 pub mod identity;
 pub mod lnd;
+pub mod mostro_db;
 pub mod notifications;
 pub mod orders;
 pub mod preflight;
