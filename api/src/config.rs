@@ -229,15 +229,12 @@ impl Configuration {
 /// Lowest `dev_fee_percentage` mostrod accepts (0.10), in basis points.
 pub const MIN_DEV_FEE_BPS: u16 = 1_000;
 
-/// Upstream `settings.tpl.toml` the renderer starts from.
-///
-/// The embedded file is the v0.19.0 template. For mostrod v0.20.0 it yields
-/// the same settings: upstream added commented-out blocks and a `[health]`
-/// section whose absence mostrod reads as the same defaults, and
-/// `api/tests/configuration.rs` fails if the two ever differ otherwise once
-/// parsed. The v0.20.0 copy in `config/upstream` is GPL-3.0-or-later like the
-/// rest of that release, so it is kept as a reference and not compiled in.
-const SETTINGS_TEMPLATE: &str = include_str!("../../config/upstream/settings.v0.19.0.toml");
+/// Upstream `settings.tpl.toml` of the pinned mostrod release, copied as it
+/// is (`scripts/bump-mostrod.py` replaces it with each new pin). The renderer
+/// starts from it, so settings the Manager does not manage keep upstream's
+/// values, new sections included. `api/tests/configuration.rs` checks that
+/// every key the Manager writes is one this template knows.
+const SETTINGS_TEMPLATE: &str = include_str!("../../config/upstream/settings.tpl.toml");
 
 /// Render an inert candidate from the pinned upstream template. The imported nsec
 /// stays in its own file; Mostro will receive it via MOSTRO_NSEC_PRIVKEY only when

@@ -827,33 +827,19 @@ async fn save_community(
             npub,
         });
 
-        let active_dir = root.join("active");
-        if active_dir.join("settings.toml").is_file() {
-            // The LND origin of the running daemon is the one recorded at
-            // activation. Without that record the draft is not applied: a
-            // guessed origin could point the daemon at another node.
-            let recorded_origin = std::fs::read(active_dir.join("status.json"))
-                .ok()
-                .and_then(|b| serde_json::from_slice::<daemon::ActiveStatus>(&b).ok())
-                .map(|s| s.lnd_grpc_origin);
-            // Restarts the daemon only if the rendered settings changed.
-            let outcome = match recorded_origin {
-                Some(origin) => daemon::sync_active_settings(&root, &origin).map(|_| ()),
-                None => Err("falta el registro de la activación (status.json)"),
-            };
-            if let Err(reason) = outcome {
-                state
-                    .notifications
-                    .publish(Notification::system_alert(
-                        "Activación incompleta",
-                        &format!(
-                            "Las reglas se guardaron, pero no llegaron a aplicarse al nodo: {reason}. Comprueba en la página Nodo Mostro qué revisión está activa y pulsa «Aplicar y reiniciar»."
-                        ),
-                        "critical",
-                        None,
-                    ))
-                    .await;
-            }
+        // Restarts the daemon only if the rendered settings changed.
+        if let Err(reason) = daemon::sync_with_recorded_origin(&root) {
+            state
+                .notifications
+                .publish(Notification::system_alert(
+                    "Activación incompleta",
+                    &format!(
+                        "Las reglas se guardaron, pero no llegaron a aplicarse al nodo: {reason}. Comprueba en la página Nodo Mostro qué revisión está activa y pulsa «Aplicar y reiniciar»."
+                    ),
+                    "critical",
+                    None,
+                ))
+                .await;
         }
     }
 

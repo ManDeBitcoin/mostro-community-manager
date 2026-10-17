@@ -4,19 +4,25 @@ Copias literales de [MostroP2P/mostro](https://github.com/MostroP2P/mostro). No 
 
 | Archivo | Origen upstream | Uso en el Manager | Licencia |
 | --- | --- | --- | --- |
-| `settings.v0.19.0.toml` | `settings.tpl.toml` en `v0.19.0` | Plantilla que el renderer compila dentro de la API | MIT |
-| `admin.v0.19.0.proto` | `proto/admin.proto` en `v0.19.0` | Contrato gRPC que compila `api/build.rs` (solo `GetVersion`) | MIT |
-| `settings.v0.20.0.toml` | `settings.tpl.toml` en `v0.20.0` | Referencia de la versión fijada; no se compila | GPL-3.0-or-later |
-| `admin.v0.20.0.proto` | `proto/admin.proto` en `v0.20.0` | Referencia de la versión fijada; no se compila | GPL-3.0-or-later |
-| `settings.v0.18.8.toml`, `admin.v0.18.8.proto` | `v0.18.8` | Histórico, sin uso | MIT |
+| `settings.tpl.toml` | `settings.tpl.toml` de la versión fijada | Plantilla de la que parte el renderer (`api/src/config.rs`) | GPL-3.0-or-later |
+| `admin.proto` | `proto/admin.proto` de la versión fijada | Contrato gRPC que compila `api/build.rs` (solo `GetVersion`) | GPL-3.0-or-later |
 
-## Por qué se compila la plantilla de v0.19.0 con el daemon v0.20.0
+Los dos llevan nombre fijo: al fijar otra versión, `scripts/bump-mostrod.py` los reemplaza junto con el resto de pines, y el diff del PR muestra exactamente qué cambió upstream. Las copias de versiones anteriores están en el historial de git.
 
-Mostro pasó de MIT a GPL-3.0-or-later en v0.19.2. Entre v0.19.0 y v0.20.0 la plantilla ganó bloques comentados (`serbero_pubkey`, `[payer_history]`, `[reputation_import]`, cambios en `[cashu]`) y una sola sección activa, `[health]`. mostrod lee una sección `[health]` ausente como sus valores por defecto (`#[serde(default)]` en `Settings::health`, `src/config/settings.rs` de v0.20.0), que son los mismos que lista la plantilla. Así que la plantilla MIT, que no la tiene, produce un `settings.toml` con el mismo efecto. El proto de v0.20.0 solo añade `RevokeReputationImports`; la API solo llama a `GetVersion`.
+## Cómo se usa la plantilla
 
-La prueba `embedded_template_is_equivalent_to_the_pinned_upstream_release` en `api/tests/configuration.rs` compara ambas plantillas ya analizadas, sin `[health]`, comprueba que los valores de `[health]` sean esos valores por defecto y que el proto solo difiera en `RevokeReputationImports`. Falla si upstream cambia cualquier otra cosa.
+El renderer parte de la plantilla de la versión fijada y sobrescribe solo lo que gestiona el panel (LND, relays, perfil, comisiones, límites, monedas, prueba de trabajo, garantía, RPC desactivado). Todo lo demás conserva el valor de upstream, así que una sección nueva (como `[health]` en v0.20.0) llega con sus valores por defecto sin tocar código.
 
-Desde la v1.0.16 el Manager es GPL-3.0-or-later (archivo `LICENSE` en la raíz del repositorio), igual que mostrod, así que compilar la plantilla GPL de la versión fijada ya no condiciona su licencia. La plantilla MIT de v0.19.0 se mantiene solo hasta que el renderer pase a usar la de la versión fijada.
+Las pruebas de `api/tests/configuration.rs` fijan el contrato con upstream:
+
+- cada clave que escribe el Manager existe en la plantilla, activa o como ejemplo comentado (`# clave = valor`), con el mismo tipo; mostrod ignora claves desconocidas, así que un cambio de nombre upstream pasaría desapercibido sin esta prueba;
+- ninguna clave activa de la plantilla se pierde al generar la configuración;
+- los valores fijos de `[anti_abuse_bond]` que el panel no muestra son los que documenta upstream;
+- la configuración generada pasa las validaciones de arranque conocidas (margen de escrow, aporte al desarrollo).
+
+Al arrancar, la API vuelve a aplicar las reglas guardadas (`daemon::sync_with_recorded_origin`): si la plantilla de una versión nueva cambia el resultado, el daemon se reinicia una sola vez durante la actualización y no en un guardado posterior.
+
+El Manager es GPL-3.0-or-later (archivo `LICENSE` en la raíz del repositorio), igual que mostrod, así que compila la plantilla GPL de la versión fijada sin condicionar su licencia.
 
 ## El binario `mostrod`
 

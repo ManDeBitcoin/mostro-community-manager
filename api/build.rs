@@ -6,9 +6,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build_server(false)
         .compile_protos_with_config(
             config,
-            &["../config/upstream/admin.v0.19.0.proto"],
+            &["../config/upstream/admin.proto"],
             &["../config/upstream"],
         )?;
-    println!("cargo:rerun-if-changed=../config/upstream/admin.v0.19.0.proto");
+    println!("cargo:rerun-if-changed=../config/upstream/admin.proto");
     Ok(())
 }
