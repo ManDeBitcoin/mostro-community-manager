@@ -224,6 +224,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
     let rate_limiter = Arc::new(mostro_community_api::RateLimiter::default());
 
+    // A new version may render the saved rules differently (a new mostrod
+    // template). Applying it now restarts the daemon once, during the update,
+    // instead of on the first unrelated save afterwards.
+    match mostro_community_api::daemon::sync_with_recorded_origin(&root) {
+        Ok(Some(applied)) if applied.settings_changed => {
+            notifications
+                .publish(mostro_community_api::notifications::Notification::system_alert(
+                    "Configuración del daemon actualizada",
+                    "Esta versión genera la configuración de mostrod de otra forma; se aplicó y el daemon se reinició una vez.",
+                    "info",
+                    None,
+                ))
+                .await;
+        }
+        Ok(_) => {}
+        Err(reason) => {
+            notifications
+                .publish(mostro_community_api::notifications::Notification::system_alert(
+                    "Activación incompleta",
+                    &format!(
+                        "Al arrancar no se pudo aplicar la configuración al nodo: {reason}. El daemon sigue con la anterior. Comprueba en la página Nodo Mostro qué revisión está activa y pulsa «Aplicar y reiniciar»."
+                    ),
+                    "critical",
+                    None,
+                ))
+                .await;
+        }
+    }
+
     // Tarea de red en segundo plano (Monitor WS de órdenes con notificaciones)
     tokio::spawn(
         mostro_community_api::orders::monitor_worker_with_notifications(

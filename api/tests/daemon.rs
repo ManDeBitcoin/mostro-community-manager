@@ -3,7 +3,7 @@ use mostro_community_api::{
     config::Configuration,
     daemon::{
         DaemonReport, DaemonState, MOSTRO_VERSION, NOTICE_CODES, activate, deactivate, report,
-        report_with_node_info, sync_active_settings,
+        report_with_node_info, sync_active_settings, sync_with_recorded_origin,
     },
     identity,
     orders::NodeInfo,
@@ -209,6 +209,46 @@ async fn activation_fails_without_identity_or_invalid_origin() {
     assert!(activate(&root, "http://127.0.0.1:10009").is_err());
     assert!(activate(&root, "https://127.0.0.1").is_err());
     assert!(activate(&root, "not-a-url").is_err());
+}
+
+/// What the API does when it starts: settings written by an earlier version
+/// (here, without the `[health]` section the v0.20.0 template adds) are
+/// rewritten once, with the LND origin recorded at activation, and the daemon
+/// is woken; the next start finds them current and leaves the daemon alone.
+#[test]
+fn startup_applies_a_new_rendering_once() {
+    let temp = tempfile::tempdir().unwrap();
+    let (root, _store) = configured_root(&temp, 32);
+    let origin = "https://127.0.0.1:10009";
+    let wake = root.join(".standby_wake");
+    let settings = root.join("active").join("settings.toml");
+
+    // Nothing activated yet: nothing to apply.
+    assert!(sync_with_recorded_origin(&root).unwrap().is_none());
+
+    activate(&root, origin).unwrap();
+    fs::remove_file(&wake).unwrap();
+    let current = fs::read_to_string(&settings).unwrap();
+    let mut older: toml::Value = toml::from_str(&current).unwrap();
+    older.as_table_mut().unwrap().remove("health").unwrap();
+    fs::write(&settings, toml::to_string_pretty(&older).unwrap()).unwrap();
+
+    let applied = sync_with_recorded_origin(&root).unwrap().unwrap();
+    assert!(applied.settings_changed);
+    assert!(wake.exists());
+    assert_eq!(fs::read_to_string(&settings).unwrap(), current);
+    fs::remove_file(&wake).unwrap();
+
+    let again = sync_with_recorded_origin(&root).unwrap().unwrap();
+    assert!(!again.settings_changed);
+    assert!(
+        !wake.exists(),
+        "a current settings.toml must not restart mostrod"
+    );
+
+    // Without the activation record the origin is unknown: nothing is applied.
+    fs::remove_file(root.join("active").join("status.json")).unwrap();
+    assert!(sync_with_recorded_origin(&root).is_err());
 }
 
 #[tokio::test]

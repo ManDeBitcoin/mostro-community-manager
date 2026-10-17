@@ -1,5 +1,7 @@
 # Mostro Community Manager v1.0.16
 
+- La configuración de mostrod se genera a partir de la plantilla oficial de la versión incluida (v0.20.0), no de una copia antigua. Los ajustes que el panel no gestiona conservan el valor de upstream; ahora el `settings.toml` incluye explícitamente la sección `[health]` con sus valores por defecto, que es lo que el daemon ya usaba.
+- **Al actualizar, el daemon se reinicia una vez** para aplicar esa configuración: el panel la vuelve a aplicar al arrancar y avisa con «Configuración del daemon actualizada». Los guardados posteriores solo lo reinician si cambia algo, como hasta ahora.
 - El Manager pasa a tener licencia: GPL-3.0-or-later, la misma que el daemon mostrod que incluye. Copyright (C) 2026 Man De Bitcoin. El texto va en `LICENSE` y, dentro de la imagen, en `/usr/share/licenses/mostro-community-manager/`.
 
 # Mostro Community Manager v1.0.15
