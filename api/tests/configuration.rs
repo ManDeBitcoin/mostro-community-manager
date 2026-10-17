@@ -1,7 +1,8 @@
 use mostro_community_api::{
-    config::{Configuration, render_settings},
+    config::{Configuration, get_regional_presets, render_settings},
     store::Store,
 };
+use std::collections::HashMap;
 fn config() -> Configuration {
     serde_json::from_str(include_str!("fixtures/community.json")).unwrap()
 }
@@ -157,47 +158,89 @@ fn corrupt_persistence_fails_closed() {
     assert!(Store::open(root.path().into()).is_err());
 }
 
-/// The renderer embeds the v0.19.0 template (MIT). It is valid for the pinned
-/// mostrod v0.20.0 as long as both templates describe the same settings, but
-/// for the `[health]` section v0.20.0 added. The renderer leaves it out, and
-/// mostrod reads an absent `[health]` as its defaults (`#[serde(default)]` on
-/// `Settings::health`), which are the values the v0.20.0 template lists. This
-/// fails the day upstream adds, removes or changes anything else, or changes
-/// those defaults, so the embedded template cannot silently fall behind the
-/// daemon that is shipped.
+/// The template the renderer starts from is upstream's `settings.tpl.toml` of
+/// the pinned release, copied as it is. Every key the Manager writes must be
+/// one that template knows, as an active key or as a commented example
+/// (`# key = value`), with the same TOML type: mostrod ignores unknown keys, so
+/// a key renamed upstream would otherwise be dropped without a word.
 #[test]
-fn embedded_template_is_equivalent_to_the_pinned_upstream_release() {
-    let embedded: toml::Value =
-        toml::from_str(include_str!("../../config/upstream/settings.v0.19.0.toml")).unwrap();
-    let mut pinned: toml::Value =
-        toml::from_str(include_str!("../../config/upstream/settings.v0.20.0.toml")).unwrap();
-    let health = pinned
-        .as_table_mut()
-        .unwrap()
-        .remove("health")
-        .expect("v0.20.0 lists [health]");
-    let health_defaults: toml::Value = toml::from_str(
-        r#"
-        enabled = true
-        interval = 60
-        watchdog_pubkey = ""
-        lnd_unsynced_fail_after = 600
-        auto_maintenance_on_lnd_unsynced = true
-        lnd_resynced_clear_after = 300
-        "#,
-    )
-    .unwrap();
-    assert_eq!(health, health_defaults);
-    assert!(embedded.get("health").is_none());
-    assert_eq!(embedded, pinned);
+fn every_rendered_key_is_one_the_pinned_template_knows() {
+    let known = template_keys(include_str!("../../config/upstream/settings.tpl.toml"));
+    let mut configs = vec![("fixture".to_string(), config())];
+    for preset in get_regional_presets() {
+        configs.push((preset.id, preset.config));
+    }
+    for (name, c) in configs {
+        let rendered: toml::Value =
+            toml::from_str(&render(&c)).unwrap_or_else(|e| panic!("{name}: {e}"));
+        for (section, key, value) in leaf_keys(&rendered) {
+            let example = known
+                .get(&(section.clone(), key.clone()))
+                .unwrap_or_else(|| {
+                    panic!("{name}: [{section}] {key} is not in the pinned template")
+                });
+            assert_eq!(
+                kind(example),
+                kind(&value),
+                "{name}: [{section}] {key} has another type than in the pinned template"
+            );
+        }
+    }
+}
 
-    // The admin gRPC contract the API is compiled against (it calls only
-    // GetVersion): v0.20.0 adds RevokeReputationImports and nothing else.
-    assert_eq!(
-        proto_lines(include_str!("../../config/upstream/admin.v0.19.0.proto")),
-        proto_lines(&without_reputation_revocation(include_str!(
-            "../../config/upstream/admin.v0.20.0.proto"
-        )))
+/// Nothing active in the template is lost: what the Manager does not manage
+/// keeps upstream's value, so new settings arrive with their defaults.
+#[test]
+fn every_active_template_key_reaches_the_rendered_settings() {
+    let template: toml::Value =
+        toml::from_str(include_str!("../../config/upstream/settings.tpl.toml")).unwrap();
+    let rendered: toml::Value = toml::from_str(&render(&config())).unwrap();
+    for (section, key, _) in leaf_keys(&template) {
+        assert!(
+            rendered.get(&section).and_then(|t| t.get(&key)).is_some(),
+            "[{section}] {key} from the template is missing in the rendered settings"
+        );
+    }
+}
+
+/// The bond settings the panel does not expose are written with fixed values.
+/// They must stay the ones upstream documents, so a changed default shows up
+/// here instead of silently diverging.
+#[test]
+fn fixed_bond_values_follow_the_pinned_template() {
+    let known = template_keys(include_str!("../../config/upstream/settings.tpl.toml"));
+    let rendered: toml::Value = toml::from_str(&render(&config())).unwrap();
+    for key in [
+        "slash_node_share_pct",
+        "payout_invoice_window_seconds",
+        "payout_max_retries",
+        "payout_claim_window_days",
+        "maker_bond_payment_timeout_seconds",
+    ] {
+        assert_eq!(
+            Some(&rendered["anti_abuse_bond"][key]),
+            known.get(&("anti_abuse_bond".to_string(), key.to_string())),
+            "[anti_abuse_bond] {key}"
+        );
+    }
+}
+
+/// Startup checks of the pinned mostrod that depend on values the Manager
+/// leaves to the template: it refuses to start outside these bounds.
+#[test]
+fn rendered_settings_pass_the_known_startup_checks() {
+    let rendered: toml::Value = toml::from_str(&render(&config())).unwrap();
+    let margin = rendered["lightning"]["escrow_deadline_margin_blocks"]
+        .as_integer()
+        .unwrap();
+    let cltv = rendered["lightning"]["hold_invoice_cltv_delta"]
+        .as_integer()
+        .unwrap();
+    assert!((18..cltv).contains(&margin), "margin {margin}, cltv {cltv}");
+    let dev_fee = rendered["mostro"]["dev_fee_percentage"].as_float().unwrap();
+    assert!(
+        (0.1..=1.0).contains(&dev_fee),
+        "dev_fee_percentage {dev_fee}"
     );
 
     // The pin recorded for packaging matches the constant the API reports.
@@ -213,33 +256,59 @@ fn embedded_template_is_equivalent_to_the_pinned_upstream_release() {
     );
 }
 
-/// Non-blank lines of a .proto file, so blank-line spacing does not count.
-fn proto_lines(proto: &str) -> Vec<&str> {
-    proto.lines().filter(|l| !l.trim().is_empty()).collect()
+/// TOML type, with integers and floats as one: mostrod reads `fee = 0` and
+/// `fee = 0.008` alike.
+fn kind(value: &toml::Value) -> &'static str {
+    match value {
+        toml::Value::Integer(_) | toml::Value::Float(_) => "number",
+        other => other.type_str(),
+    }
 }
 
-/// The admin contract without the RevokeReputationImports RPC (and the
-/// comment above it) or its two messages, all new in mostrod v0.20.0.
-fn without_reputation_revocation(proto: &str) -> String {
-    let mut kept: Vec<&str> = Vec::new();
-    let mut in_message = false;
-    for line in proto.lines() {
-        if in_message {
-            in_message = line != "}";
-        } else if line.starts_with("message RevokeReputationImports") {
-            in_message = true;
-        } else if line.contains("rpc RevokeReputationImports(") {
-            while kept
-                .last()
-                .is_some_and(|l| l.trim_start().starts_with("//"))
-            {
-                kept.pop();
+fn render(c: &Configuration) -> String {
+    render_settings(
+        c,
+        "https://lnd:10009",
+        "/lnd/tls.cert",
+        "/lnd/admin.macaroon",
+    )
+    .unwrap()
+}
+
+/// `(section, key, value)` of every non-table value, one level of sections deep.
+fn leaf_keys(doc: &toml::Value) -> Vec<(String, String, toml::Value)> {
+    let mut keys = Vec::new();
+    for (section, table) in doc.as_table().unwrap() {
+        if let Some(table) = table.as_table() {
+            for (key, value) in table {
+                if !value.is_table() {
+                    keys.push((section.clone(), key.clone(), value.clone()));
+                }
             }
-        } else {
-            kept.push(line);
         }
     }
-    kept.join("\n")
+    keys
+}
+
+/// Keys of the template, active or commented out, with their example value.
+/// A section header (`[name]`, or `# [name]` for a commented-out section)
+/// opens the section; `# key = value` lines inside it are examples.
+fn template_keys(template: &str) -> HashMap<(String, String), toml::Value> {
+    let mut keys = HashMap::new();
+    let mut section = String::new();
+    for line in template.lines() {
+        let line = line.trim().trim_start_matches('#').trim();
+        if let Some(name) = line.strip_prefix('[').and_then(|l| l.strip_suffix(']')) {
+            section = name.trim_matches(['[', ']']).to_string();
+            continue;
+        }
+        if let Ok(toml::Value::Table(entry)) = toml::from_str::<toml::Value>(line)
+            && let Some((key, value)) = entry.into_iter().next()
+        {
+            keys.entry((section.clone(), key)).or_insert(value);
+        }
+    }
+    keys
 }
 
 #[test]

@@ -655,6 +655,23 @@ pub fn sync_active_settings(
     apply_settings(root, lnd_grpc_origin, false)
 }
 
+/// Brings an active daemon's settings in line with the saved rules, using the
+/// LND origin recorded at activation. `Ok(None)` when no daemon was activated.
+/// Without that record nothing is applied: a guessed origin could point the
+/// daemon at another node.
+pub fn sync_with_recorded_origin(root: &Path) -> Result<Option<ActivationResult>, &'static str> {
+    let active_dir = root.join("active");
+    if !active_dir.join("settings.toml").is_file() {
+        return Ok(None);
+    }
+    let origin = fs::read(active_dir.join("status.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<ActiveStatus>(&bytes).ok())
+        .map(|status| status.lnd_grpc_origin)
+        .ok_or("falta el registro de la activación (status.json)")?;
+    sync_active_settings(root, &origin).map(Some)
+}
+
 fn apply_settings(
     root: &Path,
     lnd_grpc_origin: &str,
