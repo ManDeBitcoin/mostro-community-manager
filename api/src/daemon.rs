@@ -36,7 +36,7 @@ pub enum DaemonState {
 }
 
 /// mostrod release this package pins and ships (see `config/versions.json`).
-pub const MOSTRO_VERSION: &str = "0.20.0";
+pub const MOSTRO_VERSION: &str = "0.19.2";
 pub const PROTOCOL_VERSION: u32 = 2;
 
 /// Where a reported daemon version comes from, most trustworthy first.
