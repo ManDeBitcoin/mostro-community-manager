@@ -1,6 +1,6 @@
 # Instalar con Docker junto a un LND que ya tienes
 
-Para un servidor (VPS o equipo propio) que ya corre Bitcoin Core y LND. Si aún no tienes nodo, mira [nodo completo](instalar-nodo-completo.md); si usas Umbrel, [Umbrel](instalar-umbrel.md).
+Para un servidor (VPS o equipo propio) que ya corre Bitcoin Core y LND, como sea que los instalaste. El Manager no habla con Bitcoin Core: solo con LND. Si aún no tienes nodo, mira [nodo completo](instalar-nodo-completo.md); si usas Umbrel, [Umbrel](instalar-umbrel.md).
 
 Se instalan tres contenedores del Manager, todos con la misma imagen:
 
@@ -38,14 +38,14 @@ Todo lo de tu instalación queda en esta carpeta, fuera de Git: `.env`, `data/`,
 ./preparar.sh --lnd ~/.lnd
 ```
 
-Con `--lnd`, la carpeta de datos de tu LND (la que tiene `tls.cert` y `data/chain/bitcoin/…`). Si no es mainnet, añade `--red testnet`, `--red signet` o `--red regtest`. El script:
+Con `--lnd`, la carpeta de datos de tu LND (la que tiene `tls.cert` y `data/chain/bitcoin/…`). Si no es mainnet, añade `--red testnet`, `--red signet` o `--red regtest`. Si el nodo lo instalaste con [`deploy/nodo`](instalar-nodo-completo.md), usa en cambio `--nodo <su carpeta>`: además deja `.env` unido a su red. El script:
 
 - crea `.env` a partir de `.env.example`;
 - genera la contraseña del panel en `secrets/panel_password` y la muestra una vez: guárdala;
 - copia de LND `tls.cert` y `readonly.macaroon` (para el panel, en `lnd/ro/`) y `admin.macaroon` (para mostrod, como `lnd/mostro.macaroon`);
 - fija la imagen por su digest en `.env`.
 
-Se puede repetir sin pisar nada. Si prefieres copiar las credenciales a mano, deja esos tres archivos con esos nombres.
+Se puede repetir sin pisar nada, salvo las credenciales de LND, que vuelve a copiar. Hazlo si LND renueva su certificado, y después `docker compose restart web mostro`. Si prefieres copiar las credenciales a mano, deja esos tres archivos con esos nombres.
 
 ## 3. Ajustar `.env`
 

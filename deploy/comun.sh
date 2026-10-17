@@ -1,5 +1,5 @@
 # Funciones de preparar.sh y actualizar.sh. Se cargan con «.» desde la
-# carpeta de la instalación (deploy/compose o deploy/nodo-completo).
+# carpeta de la instalación (deploy/compose o deploy/nodo).
 
 paso() { printf '\n== %s\n' "$*"; }
 falla() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }

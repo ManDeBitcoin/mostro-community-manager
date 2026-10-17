@@ -12,7 +12,7 @@ Este repositorio es el código: la API, el panel y la imagen `ghcr.io/mandebitco
 | --- | --- | --- |
 | Umbrel | El Manager, con el Bitcoin Node y el Lightning Node de Umbrel | [instalar-umbrel.md](docs/instalar-umbrel.md) |
 | Docker, junto a tu LND | El Manager, conectado a un LND que ya tienes | [instalar-docker.md](docs/instalar-docker.md) ([`deploy/compose`](deploy/compose)) |
-| Docker, nodo completo | Bitcoin Core, LND y el Manager en un solo proyecto | [instalar-nodo-completo.md](docs/instalar-nodo-completo.md) ([`deploy/nodo-completo`](deploy/nodo-completo)) |
+| Docker, nodo completo | Bitcoin Core y LND en un proyecto ([`deploy/nodo`](deploy/nodo)) y el Manager aparte, unido a la red de LND | [instalar-nodo-completo.md](docs/instalar-nodo-completo.md) |
 
 En las tres, el panel se usa igual: [manual de operación](docs/DEPLOYMENT.md). Para cambiar de versión y volver atrás: [actualizar](docs/actualizar.md).
 

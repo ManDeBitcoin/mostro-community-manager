@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Prepara esta carpeta para el nodo completo: crea .env, las carpetas,
-# bitcoin.conf y lnd.conf (con una contraseña RPC nueva), la contraseña de la
-# billetera de LND (te la pide) y la del panel, y fija la imagen del Manager por
-# digest. No arranca nada. Se puede repetir: no pisa lo que ya existe.
+# Prepara esta carpeta para el nodo Bitcoin y Lightning: crea .env, las
+# carpetas, bitcoin.conf y lnd.conf (con una contraseña RPC nueva) y la
+# contraseña de la billetera de LND (te la pide). No arranca nada. Se puede
+# repetir: no pisa lo que ya existe.
 #
 # Uso: ./preparar.sh [--red mainnet|regtest] [--alias NOMBRE]
 #   --red     red de Bitcoin, por defecto mainnet (regtest: solo para pruebas)
@@ -34,8 +34,7 @@ else
   chmod 600 .env
   echo ".env creado a partir de .env.example"
 fi
-for d in data secrets respaldos; do [ -e "$d" ] || mkdir -m 700 "$d"; done
-for d in data/bitcoind data/lnd data/lnd-export data/lnd-export/ro data/mostro secrets/lnd secrets/panel; do
+for d in data secrets data/bitcoind data/lnd data/lnd-export data/lnd-export/ro secrets/lnd; do
   [ -e "$d" ] || mkdir -m 700 "$d"
 done
 
@@ -56,44 +55,28 @@ else
   echo "guardada en secrets/lnd/wallet-password: LND la usa para desbloquearse al arrancar"
 fi
 
-paso "Contraseña del panel"
-if [ -e secrets/panel/panel_password ] || ! [ -w secrets/panel ]; then
-  echo "secrets/panel/panel_password ya existe"
-else
-  contrasena="$(contrasena_nueva)"
-  (umask 077 && printf '%s\n' "$contrasena" >secrets/panel/panel_password)
-  echo "Contraseña del panel: $contrasena"
-  echo "Guárdala en tu gestor de contraseñas. Queda en secrets/panel/panel_password."
-fi
-
-paso "Imagen del Manager"
-imagen="$(env_valor MCM_IMAGE)"
-fijada="$(imagen_fijada "$imagen")" || falla "no se pudo descargar $imagen"
-env_poner MCM_IMAGE "$fijada"
-echo "$fijada"
-
 paso "Permisos"
 # bitcoind y LND corren como el usuario 1000: sus carpetas y su configuración
-# tienen que ser suyas. Solo se tocan las carpetas de primer nivel y los
-# archivos de configuración, nunca la cadena de bloques.
+# tienen que ser suyas. Solo se tocan las carpetas y los archivos de
+# configuración, nunca la cadena de bloques. Como root, con la imagen de LND.
 if [ "$(id -u)" != 1000 ]; then
-  como_root "$fijada" '
+  imagen_lnd="$(docker compose config --images | grep -m1 lightninglabs/lnd)"
+  como_root "$imagen_lnd" '
     chown 1000:1000 data/bitcoind data/lnd data/lnd-export data/lnd-export/ro secrets/lnd
     for f in data/bitcoind/bitcoin.conf data/lnd/lnd.conf secrets/lnd/wallet-password; do
-      [ -e "$f" ] && chown 1000:1000 "$f"
-    done
-    true'
+      if [ -e "$f" ]; then chown 1000:1000 "$f"; fi
+    done'
 fi
 echo "listos"
 
 paso "Siguiente"
 cat <<EOF
-1. Revisa .env (PANEL_BIND, LND_P2P_PORT) y, si quieres, data/lnd/lnd.conf (alias, externalip).
+1. Revisa .env (LND_P2P_PORT) y, si quieres, data/lnd/lnd.conf (alias, externalip).
 2. docker compose up -d
 3. Crea la billetera enseguida, con la misma contraseña que acabas de escribir:
      ./lncli create
    Responde «n» (semilla nueva) y apunta las 24 palabras en papel.
 4. Espera a que bitcoind sincronice (días en mainnet): ./bitcoin-cli getblockchaininfo
-5. Abre el panel (http://127.0.0.1:$(env_valor PANEL_PORT) o por un túnel SSH) con su contraseña.
-Guía completa: docs/instalar-nodo-completo.md
+5. Instala el Manager aparte, unido a este LND (docs/instalar-nodo-completo.md):
+     ./preparar.sh --nodo $PWD   (en la carpeta deploy/compose de otro clon)
 EOF

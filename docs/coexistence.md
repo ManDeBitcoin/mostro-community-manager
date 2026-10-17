@@ -4,7 +4,7 @@
 
 - Su propio daemon `mostrod` (el binario oficial), que espera sin hacer nada hasta que lo actives en el panel. No reutiliza la identidad, la configuración ni la base de datos de otra instancia.
 - En Umbrel: app `mandebitcoin-mostro-manager`, con contenedores de nombres distintos de cualquier otra instalación de Mostro; panel en el puerto `5173` a través de `app_proxy`; datos solo en `${APP_DATA_DIR}/data`. La API vive en la red interna `manager_private`; `app_proxy` y un puente TCP de destino fijo hacia el REST de LND la conectan con la red de Umbrel, y el puente no recibe credenciales.
-- Con Docker ([`deploy/compose`](../deploy/compose) o [`deploy/nodo-completo`](../deploy/nodo-completo)): un proyecto de Compose propio, con su nombre (`COMPOSE_PROJECT_NAME`) y sus carpetas. El nodo completo instala además Bitcoin Core y LND; `deploy/compose` usa un LND que ya tienes.
+- Con Docker ([`deploy/compose`](../deploy/compose)): un proyecto de Compose propio, con su nombre (`COMPOSE_PROJECT_NAME`) y sus carpetas, conectado a un LND que ya tienes. Si Bitcoin Core y LND los instala [`deploy/nodo`](../deploy/nodo), son otro proyecto: el Manager solo se une a la red de LND y nunca los para ni los reinicia.
 
 No incluye Watchdog, relay ni Push. No monta el socket de Docker ni la configuración o la base de datos de otro Mostro. El panel lee de LND solo `tls.cert` y `readonly.macaroon`; el daemon usa el macaroon que le des (en Umbrel, `admin.macaroon`). El `nsec` importado pertenece al almacenamiento del Manager y no se expone por HTTP. Instalar o desinstalar el Manager no reinicia ni cambia los servicios que ya tenías.
 

@@ -1,8 +1,9 @@
 """The Docker installations in deploy/ name the release they belong to.
 
 An installation is a clone of this repository at a release tag, so the
-.env.example of each one must point at the image of that same release: the
-version of the first heading of docs/release-notes.md.
+Manager's .env.example must point at the image of that same release: the
+version of the first heading of docs/release-notes.md. The node (bitcoind and
+LND) is a project apart, with its own images pinned by digest.
 """
 import re
 import unittest
@@ -10,7 +11,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 IMAGE = "ghcr.io/mandebitcoin/mostro-community-manager"
-INSTALLS = ("compose", "nodo-completo")
 
 
 class DeployTests(unittest.TestCase):
@@ -18,28 +18,26 @@ class DeployTests(unittest.TestCase):
         notes = (ROOT / "docs/release-notes.md").read_text()
         self.version = re.match(r"# Mostro Community Manager v(\d+\.\d+\.\d+)\n", notes).group(1)
 
-    def test_each_install_starts_from_this_release(self):
-        for install in INSTALLS:
-            env = (ROOT / "deploy" / install / ".env.example").read_text()
-            self.assertIn(f"\nMCM_IMAGE={IMAGE}:{self.version}\n", env, install)
+    def test_the_manager_starts_from_this_release(self):
+        env = (ROOT / "deploy/compose/.env.example").read_text()
+        self.assertIn(f"\nMCM_IMAGE={IMAGE}:{self.version}\n", env)
 
     def test_the_manager_services_share_the_image_of_env(self):
-        for install in INSTALLS:
-            compose = (ROOT / "deploy" / install / "docker-compose.yml").read_text()
-            self.assertEqual(compose.count("image: ${MCM_IMAGE:?falta MCM_IMAGE en .env}"), 3, install)
+        compose = (ROOT / "deploy/compose/docker-compose.yml").read_text()
+        self.assertEqual(compose.count("image: ${MCM_IMAGE:?falta MCM_IMAGE en .env}"), 3)
 
-    def test_the_other_images_are_pinned_by_digest(self):
-        compose = (ROOT / "deploy/nodo-completo/docker-compose.yml").read_text()
-        others = [line.strip() for line in compose.splitlines()
-                  if line.strip().startswith("image:") and "MCM_IMAGE" not in line]
-        self.assertEqual(len(others), 2)
-        for line in others:
+    def test_the_node_is_apart_and_pinned_by_digest(self):
+        compose = (ROOT / "deploy/nodo/docker-compose.yml").read_text()
+        self.assertNotIn("MCM_IMAGE", compose)
+        images = [line.strip() for line in compose.splitlines() if line.strip().startswith("image:")]
+        self.assertEqual(len(images), 2)
+        for line in images:
             self.assertRegex(line, r"^image: \S+:\S+@sha256:[0-9a-f]{64}$")
 
     def test_the_guides_clone_this_release(self):
         for guide in ("instalar-docker.md", "instalar-nodo-completo.md"):
             text = (ROOT / "docs" / guide).read_text()
-            self.assertIn(f"git clone --branch v{self.version} ", text, guide)
+            self.assertIn(f"--branch v{self.version} ", text, guide)
 
 
 if __name__ == "__main__":

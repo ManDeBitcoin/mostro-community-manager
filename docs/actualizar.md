@@ -8,9 +8,9 @@ Cada versión trae sus notas en [release-notes.md](release-notes.md). Léelas an
 - **Las migraciones de la base no tienen vuelta atrás.** Una versión de `mostrod` más vieja no arranca sobre una base que ya migró una más nueva. Por eso, antes del primer arranque de cada versión nueva de `mostrod`, el contenedor `mostro` copia la base en `config/db-snapshots/` (dentro de la carpeta de datos) y guarda las 5 últimas copias. Si no puede copiarla, no arranca.
 - **Respaldos.** Además de esas copias, un respaldo cifrado desde la página Respaldos guarda identidad, reglas y base. Cópialo fuera del equipo.
 
-## Docker (deploy/compose y deploy/nodo-completo)
+## Docker (deploy/compose)
 
-Desde la carpeta de la instalación:
+Desde la carpeta `deploy/compose` de la instalación:
 
 ```bash
 ../actualizar.sh --prueba 1.0.17
@@ -27,10 +27,12 @@ Desde la carpeta de la instalación:
 3. **Prueba en seco.** Arranca el `mostrod` nuevo sin red y con una clave de prueba sobre una copia de tu base y con tus reglas: tiene que cargar la configuración y migrar la base sin errores. Así un fallo de migración se ve antes de parar nada.
 4. **Respaldo.** Para `web` y `mostro`, vuelve a revisar que no haya empezado una operación y copia toda la carpeta de datos (identidad, reglas y base) en `respaldos/mcm-antes-1.0.17-…`. Esa copia lleva la identidad sin cifrar: no la saques del equipo así.
 5. **Archivos.** Pasa el clon del repositorio al tag `v1.0.17` y cambia `MCM_IMAGE` en `.env`. Si la versión nueva necesita algo en `.env` que no tienes, vuelve a la anterior sin tocar los datos y te lo dice.
-6. **Arranque** de `init`, `web` y `mostro`. LND y Bitcoin Core no se tocan.
+6. **Arranque** de `init`, `web` y `mostro`. LND y Bitcoin Core no se tocan: viven en otro proyecto (o en otro equipo) y siguen funcionando durante toda la actualización.
 7. **Verificación.** El panel tiene que responder con la versión nueva y, si el daemon estaba activado, `mostrod` tiene que cargar su configuración.
 
 El script se niega a seguir si modificaste archivos del repositorio: lo propio de tu instalación va en `.env` o en `docker-compose.override.yml`.
+
+LND y Bitcoin Core, si los instalaste con `deploy/nodo`, se actualizan aparte y cuando tú decidas: ver [nodo completo](instalar-nodo-completo.md#actualizar).
 
 ### Volver atrás
 
@@ -54,7 +56,7 @@ Umbrel no tiene vuelta atrás desde su interfaz. Si una versión nueva falla, la
 
 ## Coolify
 
-Coolify guarda su propia copia del compose, así que `actualizar.sh` no sirve. Cambia la línea `image:` de `init`, `web` y `mostro` a `ghcr.io/mandebitcoin/mostro-community-manager:X.Y.Z@sha256:<digest>` y despliega. El digest se obtiene con:
+Coolify guarda su propia copia del compose, así que `actualizar.sh` no sirve. Con el Manager en su propio recurso (separado del de LND y Bitcoin Core), cambia la línea `image:` de `init`, `web` y `mostro` a `ghcr.io/mandebitcoin/mostro-community-manager:X.Y.Z@sha256:<digest>` y despliega solo ese recurso. El digest se obtiene con:
 
 ```bash
 docker buildx imagetools inspect ghcr.io/mandebitcoin/mostro-community-manager:1.0.17

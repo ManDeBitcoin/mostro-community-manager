@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Actualiza el Mostro Community Manager de una instalación de deploy/ a la
 # versión X.Y.Z, o la devuelve a como estaba antes de la última actualización.
-# Se ejecuta desde la carpeta de la instalación (deploy/compose o
-# deploy/nodo-completo). Solo toca init, web y mostro: nunca LND ni bitcoind.
+# Se ejecuta desde la carpeta deploy/compose de la instalación. Solo toca init,
+# web y mostro: nunca LND ni bitcoind, que viven en otro proyecto.
 #
 # Uso: ../actualizar.sh [--prueba] X.Y.Z
 #      ../actualizar.sh --volver [--si]

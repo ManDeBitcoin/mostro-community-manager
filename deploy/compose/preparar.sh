@@ -2,22 +2,28 @@
 # Prepara esta carpeta para instalar el Manager junto a un LND que ya tienes:
 # crea .env, las carpetas y la contraseña del panel, copia las credenciales de
 # LND si le dices dónde están y fija la imagen por digest. No arranca nada.
-# Se puede repetir: no pisa lo que ya existe.
+# Se puede repetir: no pisa lo que ya existe, salvo las credenciales de LND,
+# que vuelve a copiar (por ejemplo si LND renovó su certificado).
 #
-# Uso: ./preparar.sh [--lnd CARPETA_DE_LND] [--red mainnet|testnet|signet|regtest]
-#   --lnd   la carpeta de datos de LND (la que tiene tls.cert y data/chain/...)
-#   --red   la red de esa billetera, por defecto mainnet
+# Uso: ./preparar.sh [--lnd CARPETA_DE_LND [--red mainnet|testnet|signet|regtest]]
+#      ./preparar.sh --nodo CARPETA_DE_DEPLOY_NODO
+#   --lnd    la carpeta de datos de LND (la que tiene tls.cert y data/chain/...)
+#   --red    la red de esa billetera, por defecto mainnet
+#   --nodo   un nodo instalado con deploy/nodo: copia sus credenciales y deja
+#            .env unido a su red de LND
 set -euo pipefail
 cd "$(dirname "$0")"
 . ../comun.sh
 
 lnd_dir=""
+nodo_dir=""
 red=mainnet
 while [ $# -gt 0 ]; do
   case "$1" in
     --lnd) lnd_dir="${2:?falta la carpeta de --lnd}"; shift ;;
     --red) red="${2:?falta la red de --red}"; shift ;;
-    -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
+    --nodo) nodo_dir="${2:?falta la carpeta de --nodo}"; shift ;;
+    -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
     *) falla "opción desconocida: $1" ;;
   esac
   shift
@@ -55,13 +61,36 @@ env_poner MCM_IMAGE "$fijada"
 echo "$fijada"
 
 paso "Credenciales de LND"
-if [ -n "$lnd_dir" ]; then
+if [ -n "$nodo_dir" ]; then
+  [ -f "$nodo_dir/docker-compose.yml" ] && [ -d "$nodo_dir/data/lnd-export" ] ||
+    falla "$nodo_dir no es una instalación de deploy/nodo (falta data/lnd-export)"
+  nodo_dir="$(cd "$nodo_dir" && pwd)"
+  red_lnd="$(sed -n 's/^NODO_RED_LND=//p' "$nodo_dir/.env" 2>/dev/null | tail -n 1)"
+  red_lnd="${red_lnd:-nodo-lnd}"
+  # Como root: la carpeta del nodo es del usuario 1000 y modo 700.
+  docker run --rm --network none --user 0:0 --entrypoint sh \
+    -v "$nodo_dir/data/lnd-export:/src:ro" -v "$PWD/lnd:/dst" "$fijada" -c "
+      set -e
+      mkdir -p /dst/ro
+      cp /src/ro/tls.cert /dst/ro/tls.cert
+      cp /src/ro/readonly.macaroon /dst/ro/readonly.macaroon
+      cp /src/admin.macaroon /dst/mostro.macaroon
+      chown -R 1000:1000 /dst && chmod 700 /dst /dst/ro && chmod 600 /dst/mostro.macaroon /dst/ro/*" ||
+    falla "no se pudieron copiar las credenciales de $nodo_dir/data/lnd-export: ¿ya arrancó LND y creaste la billetera?"
+  env_poner COMPOSE_FILE docker-compose.yml:docker-compose.red-lnd.yml
+  env_poner LND_DOCKER_NETWORK "$red_lnd"
+  env_poner LND_GRPC_HOST https://lnd:10009
+  env_poner LND_REST_URL https://lnd:8080
+  echo "copiados a lnd/: ro/tls.cert, ro/readonly.macaroon y mostro.macaroon (admin)"
+  echo ".env unido a la red $red_lnd, con LND en https://lnd:10009 y https://lnd:8080"
+elif [ -n "$lnd_dir" ]; then
   [ -d "$lnd_dir" ] || falla "no existe la carpeta $lnd_dir"
   macaroons="data/chain/bitcoin/$red"
   # Como root: la carpeta de LND suele ser de otro usuario y modo 700.
   docker run --rm --network none --user 0:0 --entrypoint sh \
     -v "$(cd "$lnd_dir" && pwd):/src:ro" -v "$PWD/lnd:/dst" "$fijada" -c "
       set -e
+      mkdir -p /dst/ro
       cp /src/tls.cert /dst/ro/tls.cert
       cp /src/$macaroons/readonly.macaroon /dst/ro/readonly.macaroon
       cp /src/$macaroons/admin.macaroon /dst/mostro.macaroon
@@ -74,6 +103,8 @@ else
   cat <<EOF
 Faltan. Vuelve a ejecutar con la carpeta de LND, por ejemplo:
   ./preparar.sh --lnd ~/.lnd
+o, si el nodo lo instalaste con deploy/nodo:
+  ./preparar.sh --nodo ~/nodo-bitcoin/deploy/nodo
 o copia a mano tls.cert a lnd/ro/tls.cert, readonly.macaroon a
 lnd/ro/readonly.macaroon y admin.macaroon a lnd/mostro.macaroon.
 EOF

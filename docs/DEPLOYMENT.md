@@ -8,7 +8,7 @@ Cómo poner en marcha y operar una comunidad Mostro desde el panel. Vale para to
 | --- | --- |
 | Umbrel | [Instalar en Umbrel](instalar-umbrel.md) |
 | Docker, junto a un LND que ya tienes | [Instalar con Docker](instalar-docker.md) |
-| Docker, nodo completo (Bitcoin Core, LND y el Manager) | [Instalar un nodo completo](instalar-nodo-completo.md) |
+| Docker, nodo completo (Bitcoin Core y LND, y el Manager aparte) | [Instalar un nodo completo](instalar-nodo-completo.md) |
 
 Para cambiar de versión: [actualizar y volver atrás](actualizar.md).
 
