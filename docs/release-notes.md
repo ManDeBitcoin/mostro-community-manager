@@ -2,6 +2,7 @@
 
 - La configuración de mostrod se genera a partir de la plantilla oficial de la versión incluida (v0.20.0), no de una copia antigua. Los ajustes que el panel no gestiona conservan el valor de upstream; ahora el `settings.toml` incluye explícitamente la sección `[health]` con sus valores por defecto, que es lo que el daemon ya usaba.
 - **Al actualizar, el daemon se reinicia una vez** para aplicar esa configuración: el panel la vuelve a aplicar al arrancar y avisa con «Configuración del daemon actualizada». Los guardados posteriores solo lo reinician si cambia algo, como hasta ahora.
+- **Copia de la base antes de cada versión nueva de mostrod.** Las migraciones de la base del daemon no tienen vuelta atrás: la versión anterior de mostrod no arranca sobre una base que la nueva ya migró. Antes del primer arranque de otra versión, el Manager copia la base en `db-snapshots/`, junto a la configuración, y guarda las 5 copias más recientes. Si no puede hacer la copia, el daemon no arranca. La primera vez se hace una copia aunque la versión no cambie, porque las instalaciones anteriores no tienen registrada la suya.
 - El Manager pasa a tener licencia: GPL-3.0-or-later, la misma que el daemon mostrod que incluye. Copyright (C) 2026 Man De Bitcoin. El texto va en `LICENSE` y, dentro de la imagen, en `/usr/share/licenses/mostro-community-manager/`.
 
 # Mostro Community Manager v1.0.15

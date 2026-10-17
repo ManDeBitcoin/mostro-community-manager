@@ -27,6 +27,7 @@ class DaemonPinTests(unittest.TestCase):
         for name in ("docker/Dockerfile", "docker/Dockerfile.mostro"):
             text = (ROOT / name).read_text()
             self.assertIn(f"/releases/download/v{self.version}/", text, name)
+            self.assertIn(f"ENV MOSTROD_VERSION={self.version}\n", text, name)
             for checksum in self.checksums:
                 self.assertIn(checksum, text, name)
 

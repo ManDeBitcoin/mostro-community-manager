@@ -58,6 +58,7 @@ class BumpMostrodTests(unittest.TestCase):
         for dockerfile in ("docker/Dockerfile", "docker/Dockerfile.mostro"):
             text = (self.root / dockerfile).read_text()
             self.assertIn(f"/releases/download/v{self.new}/", text)
+            self.assertIn(f"ENV MOSTROD_VERSION={self.new}\n", text)
             self.assertIn(NEW_AMD64, text)
             self.assertIn(NEW_ARM64, text)
             self.assertNotIn(self.old["linux_amd64_sha256"], text)

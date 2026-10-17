@@ -23,5 +23,7 @@ COPY docker/mostro-entrypoint.sh /usr/local/bin/mostro-entrypoint
 USER 1000:1000
 WORKDIR /data
 ENV TERM=xterm
+# The mostrod release above; the entrypoint copies the database before another one starts.
+ENV MOSTROD_VERSION=0.20.0
 # Deliberately no default settings or identity: both must be mounted explicitly.
 ENTRYPOINT ["/bin/sh", "/usr/local/bin/mostro-entrypoint"]

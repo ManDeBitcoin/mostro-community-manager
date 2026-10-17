@@ -12,6 +12,9 @@ settings_dir=${MOSTRO_SETTINGS_DIR:-/data}
 stop_grace=${MOSTRO_STOP_GRACE_SECONDS:-8}
 # Pause before restarting a daemon that exited on its own.
 restart_backoff=${MOSTRO_RESTART_BACKOFF_SECONDS:-5}
+# Copies of the database taken before another mostrod version first starts.
+snapshot_dir=${MOSTRO_DB_SNAPSHOT_DIR:-$(dirname "$settings_dir")/db-snapshots}
+snapshot_keep=${MOSTRO_DB_SNAPSHOT_KEEP:-5}
 
 fail() {
     printf '%s\n' "Mostro startup refused: $1" >&2
@@ -41,6 +44,42 @@ load_identity() {
         *) fail 'private identity is not an nsec' ;;
     esac
     export MOSTRO_NSEC_PRIVKEY
+}
+
+# mostrod migrates its database when it starts, and migrations only go
+# forward: the previous version refuses a database a newer one migrated.
+# Before the first start of another version (MOSTROD_VERSION, set in the
+# image), keep a copy of the database as it was, so going back stays
+# possible. mostrod is not running here, so a plain copy is consistent. The
+# version is recorded before starting, so a daemon that fails to start never
+# makes a second copy of a database it may already have migrated.
+snapshot_if_version_changed() {
+    version=${MOSTROD_VERSION:-}
+    [ -n "$version" ] || return 0
+    marker="$settings_dir/mostro.version"
+    previous=
+    if [ -f "$marker" ]; then
+        IFS= read -r previous < "$marker" || true
+    fi
+    [ "$previous" != "$version" ] || return 0
+    if [ -f "$settings_dir/mostro.db" ]; then
+        mkdir -p "$snapshot_dir" 2>/dev/null && chmod 700 "$snapshot_dir" \
+            || fail "cannot create $snapshot_dir to copy the database before mostrod $version"
+        name="mostro-${previous:-desconocida}-a-$version-$(date -u +%Y%m%dT%H%M%SZ).db"
+        for suffix in '' -journal -wal -shm; do
+            [ -f "$settings_dir/mostro.db$suffix" ] || continue
+            cp -p "$settings_dir/mostro.db$suffix" "$snapshot_dir/$name$suffix" 2>/dev/null \
+                || fail "could not copy mostro.db$suffix before mostrod $version"
+        done
+        printf '%s\n' "Mostro daemon: copia de la base antes de pasar a mostrod $version: $snapshot_dir/$name"
+        ls -1t "$snapshot_dir"/mostro-*.db 2>/dev/null | tail -n +$((snapshot_keep + 1)) | while IFS= read -r old; do
+            rm -f "$old" "$old-journal" "$old-wal" "$old-shm"
+        done
+    fi
+    printf '%s\n' "$version" > "$marker" || fail 'could not record the mostrod version'
+    if [ -n "$previous" ] && [ "$(printf '%s\n%s\n' "$previous" "$version" | sort -V | tail -n 1)" = "$previous" ]; then
+        printf '%s\n' "Mostro daemon: aviso: se pasa de mostrod $previous a $version, una versión anterior. Si $previous migró la base, mostrod no arrancará: restaura la copia previa a esa actualización desde $snapshot_dir." >&2
+    fi
 }
 
 if [ "${STANDBY_IF_UNCONFIGURED:-false}" = "true" ]; then
@@ -98,6 +137,7 @@ if [ "${STANDBY_IF_UNCONFIGURED:-false}" = "true" ]; then
         printf '%s\n' "Mostro daemon: configuración activa detectada. Iniciando mostrod..."
 
         load_identity
+        snapshot_if_version_changed
 
         started_at=$(date +%s)
         /usr/local/bin/mostrod -d "$settings_dir" "$@" &
@@ -152,4 +192,5 @@ if [ "${STANDBY_IF_UNCONFIGURED:-false}" = "true" ]; then
 fi
 
 load_identity
+snapshot_if_version_changed
 exec /usr/local/bin/mostrod -d "$settings_dir" "$@"
