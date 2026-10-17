@@ -54,6 +54,8 @@ export function NodePage({
   const notices = daemonNotices(daemon).filter((notice) => !(exitIsNews && notice.code === 'daemon_unexpected_exit'));
   // Recent on the relays, but published by the process that ran before this one.
   const beforeStart = Boolean(daemon?.announced_before_start);
+  const inFlight = daemon?.open_orders?.in_flight ?? 0;
+  const pendingOffers = daemon?.open_orders?.pending ?? 0;
 
   const copyNpub = () => {
     if (!daemon?.npub) return;
@@ -146,6 +148,12 @@ export function NodePage({
       {lastExit && exitIsNews && (
         <Callout tone="warn" title="El daemon terminó de forma inesperada">
           Terminó con {exitCode} tras {formatAge(lastExit.uptime_secs)} en marcha, {formatAgo(lastExit.at_unix)}. {running ? 'El supervisor lo volvió a arrancar.' : 'El supervisor lo vuelve a intentar con una pausa entre intentos.'}
+        </Callout>
+      )}
+
+      {inFlight > 0 && (
+        <Callout tone="warn" title="Hay operaciones en curso">
+          {inFlight === 1 ? 'Una operación está' : `${inFlight} operaciones están`} en curso{pendingOffers > 0 ? ` y hay ${pendingOffers === 1 ? 'una oferta publicada' : `${pendingOffers} ofertas publicadas`}` : ''}. Espera a que terminen antes de actualizar o reiniciar el nodo.
         </Callout>
       )}
 

@@ -16,10 +16,14 @@ use std::{
 use tokio::sync::RwLock;
 use zeroize::Zeroizing;
 
-use crate::{identity, store::Document};
+use crate::{identity, mostro_db, store::Document};
 
 const MAX_PLAINTEXT: u64 = 1024 * 1024;
 const MAX_CIPHERTEXT: u64 = 2 * 1024 * 1024;
+/// Largest daemon database a backup may hold once decrypted.
+const MAX_DATABASE: u64 = 1024 * 1024 * 1024;
+/// Prefix of the companion file holding the daemon's database.
+const DATABASE_PREFIX: &str = "mostro-db-";
 
 #[derive(Serialize)]
 struct BackupWrite<'a> {
@@ -43,6 +47,9 @@ pub struct Summary {
     pub npub: String,
     pub revision: u64,
     pub path: PathBuf,
+    /// The daemon's database, encrypted with the same passphrase, when the
+    /// node has one (`mostro-db-rev<N>-<ts>.age`, next to `path`).
+    pub database_path: Option<PathBuf>,
 }
 
 fn read_document(root: &Path) -> Result<Document, &'static str> {
@@ -196,7 +203,7 @@ pub fn export_to_dir(
         .as_file()
         .sync_all()
         .map_err(|_| "No se pudo sincronizar el backup")?;
-    let (verified_npub, verified_revision) = decode_backup(temporary.path(), passphrase)?;
+    let (verified_npub, verified_revision) = decode_backup(temporary.path(), passphrase.clone())?;
     if verified_npub != npub || verified_revision != document.revision {
         return Err("El backup cifrado no superó la verificación");
     }
@@ -214,11 +221,180 @@ pub fn export_to_dir(
     File::open(target_dir)
         .and_then(|file| file.sync_all())
         .map_err(|_| "Backup guardado; no se pudo sincronizar el directorio")?;
+    // The rules alone cannot bring a market back: the daemon's database holds
+    // its orders, users and bonds. It goes in its own file, so the format
+    // above stays readable by earlier versions and its size limit holds.
+    let database = mostro_db::database_path(root);
+    let database_path = if database.is_file() {
+        let name = format!("{DATABASE_PREFIX}rev{}-{timestamp}.age", document.revision);
+        Some(
+            export_database(&database, target_dir, &name, &passphrase).map_err(
+                |_| "Respaldo de reglas guardado, pero la base de mostrod no se pudo respaldar",
+            )?,
+        )
+    } else {
+        None
+    };
     Ok(Summary {
         npub,
         revision: document.revision,
         path,
+        database_path,
     })
+}
+
+/// Encrypts a consistent copy of the daemon's database into `target_dir/name`,
+/// then decrypts it again and compares it with the copy before keeping it.
+fn export_database(
+    database: &Path,
+    target_dir: &Path,
+    name: &str,
+    passphrase: &SecretString,
+) -> Result<PathBuf, &'static str> {
+    // Plaintext copies live only in a private folder that is removed after.
+    let work = tempfile::Builder::new()
+        .prefix(".mostro-db-")
+        .tempdir_in(target_dir)
+        .map_err(|_| "No se pudo preparar la copia de la base")?;
+    fs::set_permissions(work.path(), fs::Permissions::from_mode(0o700))
+        .map_err(|_| "No se pudo restringir la copia de la base")?;
+    let copy = work.path().join("mostro.db");
+    mostro_db::snapshot(database, &copy)?;
+    if !mostro_db::check(&copy)?.healthy() {
+        return Err("La copia de la base de mostrod no está íntegra");
+    }
+
+    let mut encrypted = tempfile::NamedTempFile::new_in(target_dir)
+        .map_err(|_| "No se pudo crear el respaldo de la base")?;
+    encrypted
+        .as_file()
+        .set_permissions(fs::Permissions::from_mode(0o600))
+        .map_err(|_| "No se pudieron restringir los permisos del respaldo de la base")?;
+    let mut writer = Encryptor::with_user_passphrase(passphrase.clone())
+        .wrap_output(encrypted.as_file_mut())
+        .map_err(|_| "No se pudo iniciar el cifrado de la base")?;
+    io::copy(
+        &mut File::open(&copy).map_err(|_| "No se pudo leer la copia de la base")?,
+        &mut writer,
+    )
+    .map_err(|_| "No se pudo cifrar la base")?;
+    writer
+        .finish()
+        .map_err(|_| "No se pudo cerrar el cifrado de la base")?;
+    encrypted
+        .as_file()
+        .sync_all()
+        .map_err(|_| "No se pudo sincronizar el respaldo de la base")?;
+
+    let verified = work.path().join("verified.db");
+    decrypt_database(encrypted.path(), passphrase.clone(), &verified)?;
+    if sha256_file(&verified)? != sha256_file(&copy)? {
+        return Err("El respaldo cifrado de la base no superó la verificación");
+    }
+    let path = target_dir.join(name);
+    encrypted
+        .persist_noclobber(&path)
+        .map_err(|_| "Ya existe un respaldo de la base con ese nombre")?;
+    File::open(target_dir)
+        .and_then(|file| file.sync_all())
+        .map_err(|_| "Respaldo de la base guardado; no se pudo sincronizar el directorio")?;
+    Ok(path)
+}
+
+fn sha256_file(path: &Path) -> Result<Vec<u8>, &'static str> {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    io::copy(
+        &mut File::open(path).map_err(|_| "No se pudo leer la base")?,
+        &mut hasher,
+    )
+    .map_err(|_| "No se pudo leer la base")?;
+    Ok(hasher.finalize().to_vec())
+}
+
+/// Decrypts a database backup into `destination`, a new private file.
+fn decrypt_database(
+    archive: &Path,
+    passphrase: SecretString,
+    destination: &Path,
+) -> Result<(), &'static str> {
+    let metadata =
+        fs::symlink_metadata(archive).map_err(|_| "Respaldo de la base no disponible")?;
+    if !metadata.is_file() {
+        return Err("El respaldo de la base no es un archivo regular");
+    }
+    let file = File::open(archive).map_err(|_| "No se pudo abrir el respaldo de la base")?;
+    let decryptor = Decryptor::new(file).map_err(|_| "Respaldo age inválido")?;
+    let identity = age::scrypt::Identity::new(passphrase);
+    let mut reader = decryptor
+        .decrypt(std::iter::once(&identity as &dyn age::Identity))
+        .map_err(|_| "No se pudo descifrar el respaldo de la base")?;
+    let mut output = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(destination)
+        .map_err(|_| "No se pudo crear la base restaurada")?;
+    let written = io::copy(&mut reader.by_ref().take(MAX_DATABASE + 1), &mut output)
+        .map_err(|_| "No se pudo descifrar la base")?;
+    if written > MAX_DATABASE {
+        return Err("La base del respaldo es demasiado grande");
+    }
+    output
+        .sync_all()
+        .map_err(|_| "No se pudo sincronizar la base restaurada")
+}
+
+/// Writes the database of a backup to `destination`, which must not exist,
+/// after checking it. Nothing running is touched: putting it in place of
+/// `active/mostro.db`, with the daemon stopped, is the operator's step.
+pub fn restore_database(
+    archive: &Path,
+    destination: &Path,
+    passphrase: SecretString,
+) -> Result<mostro_db::DbCheck, &'static str> {
+    if !destination.is_absolute() {
+        return Err("El destino de restauración debe ser absoluto");
+    }
+    let parent = destination
+        .parent()
+        .ok_or("Destino de restauración inválido")?;
+    if fs::symlink_metadata(destination).is_ok() {
+        return Err("El destino ya existe; no se sobrescribe");
+    }
+    let work = tempfile::Builder::new()
+        .prefix(".mostro-db-restore-")
+        .tempdir_in(parent)
+        .map_err(|_| "No se pudo preparar la restauración")?;
+    let restored = work.path().join("mostro.db");
+    decrypt_database(archive, passphrase, &restored)?;
+    let checked = mostro_db::check(&restored)?;
+    if !checked.healthy() {
+        return Err("La base del respaldo no está íntegra");
+    }
+    if fs::symlink_metadata(destination).is_ok() {
+        return Err("El destino ya existe; no se sobrescribe");
+    }
+    fs::rename(&restored, destination).map_err(|_| "No se pudo publicar la base restaurada")?;
+    Ok(checked)
+}
+
+pub fn restore_database_interactive(
+    archive: &Path,
+    destination: &Path,
+) -> Result<(), &'static str> {
+    if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
+        return Err("La restauración requiere una terminal interactiva local (-it)");
+    }
+    let passphrase = rpassword::prompt_password("Frase del backup (entrada oculta): ")
+        .map_err(|_| "No se pudo leer la frase")?;
+    let checked = restore_database(archive, destination, SecretString::from(passphrase))?;
+    println!(
+        "Base restaurada en {} ({} migraciones, integridad ok). No se aplicó al nodo: con mostrod parado, ponla en lugar de active/mostro.db.",
+        destination.display(),
+        checked.migrations
+    );
+    Ok(())
 }
 
 pub fn export(root: &Path, passphrase: SecretString) -> Result<Summary, &'static str> {
@@ -232,6 +408,7 @@ pub fn verify(path: &Path, passphrase: SecretString) -> Result<Summary, &'static
         npub,
         revision,
         path: path.to_path_buf(),
+        database_path: None,
     })
 }
 
@@ -295,6 +472,7 @@ pub fn restore_to_new_dir(
         npub: envelope.npub.to_owned(),
         revision: envelope.document.revision,
         path: destination.to_path_buf(),
+        database_path: None,
     })
 }
 
@@ -358,6 +536,32 @@ pub struct BackupEntryInfo {
     pub path: String,
     pub size_bytes: u64,
     pub modified_timestamp: u64,
+    /// `rules` (identity and rules) or `database` (the daemon's database).
+    #[serde(default)]
+    pub kind: String,
+}
+
+fn backup_kind(filename: &str) -> &'static str {
+    if filename.starts_with(DATABASE_PREFIX) {
+        "database"
+    } else {
+        "rules"
+    }
+}
+
+/// The files of one backup share the timestamp at the end of their names
+/// (`…-<unix seconds>.age`); a file named otherwise is a backup of its own.
+fn backup_group(path: &Path) -> String {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    name.strip_suffix(".age")
+        .and_then(|stem| stem.rsplit_once('-'))
+        .map(|(_, timestamp)| timestamp)
+        .filter(|timestamp| !timestamp.is_empty() && timestamp.bytes().all(|b| b.is_ascii_digit()))
+        .map(str::to_owned)
+        .unwrap_or(name)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -410,6 +614,7 @@ pub fn list_backups(target_dir: &Path) -> Vec<BackupEntryInfo> {
                     .map(|n| n.to_string_lossy().to_string())
                     .unwrap_or_default();
                 list.push(BackupEntryInfo {
+                    kind: backup_kind(&filename).to_string(),
                     filename,
                     path: path.to_string_lossy().to_string(),
                     size_bytes: meta.len(),
@@ -449,12 +654,24 @@ pub fn apply_retention_policy(
         }
     }
 
-    // Sort descending by modified time (newest first)
-    backups.sort_by_key(|entry| std::cmp::Reverse(entry.1));
+    // A backup is the rules file plus, when the node has one, its database
+    // file: keep or remove them together, newest backups first.
+    let mut groups: Vec<(String, SystemTime, Vec<PathBuf>)> = Vec::new();
+    for (path, mtime) in backups {
+        let group = backup_group(&path);
+        match groups.iter_mut().find(|(name, _, _)| *name == group) {
+            Some((_, newest, paths)) => {
+                *newest = (*newest).max(mtime);
+                paths.push(path);
+            }
+            None => groups.push((group, mtime, vec![path])),
+        }
+    }
+    groups.sort_by_key(|group| std::cmp::Reverse(group.1));
 
     let mut removed = Vec::new();
-    if backups.len() > keep {
-        for (path, _) in &backups[keep..] {
+    for (_, _, paths) in groups.iter().skip(keep) {
+        for path in paths {
             if fs::remove_file(path).is_ok() {
                 removed.push(path.clone());
             }

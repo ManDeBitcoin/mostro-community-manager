@@ -975,6 +975,7 @@ async fn backup_trigger_handler(
     Ok(Json(json!({
         "status": "ok",
         "path": summary.path.display().to_string(),
+        "database_path": summary.database_path.as_ref().map(|p| p.display().to_string()),
         "revision": summary.revision,
         "npub": summary.npub
     })))

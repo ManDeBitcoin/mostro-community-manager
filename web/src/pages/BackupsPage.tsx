@@ -40,7 +40,7 @@ export function BackupsPage({ data }: { data: PanelData }) {
       <PageHeader group="Ajustes" title="Respaldos" description="Copias cifradas de la identidad del nodo y de las reglas de la comunidad." />
 
       <Callout tone="info" title="Qué guarda un respaldo y qué no">
-        Guarda la clave privada del nodo y la configuración guardada, cifradas con tu frase. No guarda la base de datos del daemon: las operaciones en curso, las disputas y la reputación no se recuperan con este archivo.
+        Guarda la clave privada del nodo y la configuración guardada en un archivo, y la base de datos del daemon (órdenes, usuarios, garantías y reputación) en otro, <code>mostro-db-…</code>, con la misma fecha. Los dos se cifran con tu frase y se comprueban antes de darlos por buenos; si el nodo aún no tiene base, solo se guarda el primero.
       </Callout>
 
       <Panel id="backup-now" title="Crear un respaldo ahora" description="El archivo se cifra con la frase que escribas y se comprueba antes de darlo por bueno. Sin esa frase no se puede abrir: guárdala aparte.">
@@ -104,6 +104,7 @@ export function BackupsPage({ data }: { data: PanelData }) {
               {backups.backups.map((entry) => (
                 <li key={entry.filename}>
                   <code>{entry.filename}</code>
+                  <span>{entry.kind === 'database' ? 'Base del daemon' : 'Identidad y reglas'}</span>
                   <span>{(entry.size_bytes / 1024).toFixed(1)} KB</span>
                   <time dateTime={new Date(entry.modified_timestamp * 1000).toISOString()}>{formatDateTime(entry.modified_timestamp)}</time>
                 </li>
@@ -130,6 +131,10 @@ export function BackupsPage({ data }: { data: PanelData }) {
           <li>
             <strong>Restaura en una carpeta que aún no exista.</strong>
             <code className="command">{DOCKER_EXEC} restore-backup {backupDir}/&lt;archivo.age&gt; {backupDir}/restaurado</code>
+          </li>
+          <li>
+            <strong>La base del daemon se restaura aparte</strong>, en un archivo que aún no exista; se comprueba su integridad antes de escribirlo.
+            <code className="command">{DOCKER_EXEC} restore-db {backupDir}/mostro-db-&lt;…&gt;.age {backupDir}/mostro.db</code>
           </li>
         </ol>
         <p className="panel-note">

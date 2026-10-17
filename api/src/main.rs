@@ -29,6 +29,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
             .map_err(|message| message.into());
         }
+        if args.len() == 3 && args[0] == "restore-db" {
+            return mostro_community_api::backup::restore_database_interactive(
+                &PathBuf::from(&args[1]),
+                &PathBuf::from(&args[2]),
+            )
+            .map_err(|message| message.into());
+        }
+        // The daemon's database: by default the active one under CONFIG_DIR.
+        if (args.len() == 1 || args.len() == 2)
+            && (args[0] == "open-orders" || args[0] == "db-check")
+        {
+            let database = args.get(1).map(PathBuf::from).unwrap_or_else(|| {
+                mostro_community_api::mostro_db::database_path(&PathBuf::from(
+                    std::env::var("CONFIG_DIR").unwrap_or_else(|_| "./var/config".into()),
+                ))
+            });
+            if args[0] == "db-check" {
+                let checked = mostro_community_api::mostro_db::check(&database)?;
+                println!("{}", serde_json::to_string_pretty(&checked)?);
+                if !checked.healthy() {
+                    std::process::exit(1);
+                }
+                return Ok(());
+            }
+            // Exit status for update scripts: 3 with trades under way, 4 with
+            // published offers only, 0 with nothing open.
+            let open = mostro_community_api::mostro_db::open_orders(&database)?;
+            println!("{}", serde_json::to_string_pretty(&open)?);
+            if open.in_flight > 0 {
+                std::process::exit(3);
+            }
+            if open.pending > 0 {
+                std::process::exit(4);
+            }
+            return Ok(());
+        }
         // The settings.toml the daemon would get from saved rules (a
         // community.json, or a bare configuration) or from a preset, for
         // checking it against the real mostrod (scripts/daemon-contract-smoke.sh).
@@ -192,6 +228,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 serde_json::json!({
                     "status": "ok",
                     "path": summary.path.display().to_string(),
+                    "database_path": summary.database_path.as_ref().map(|p| p.display().to_string()),
                     "revision": summary.revision,
                     "npub": summary.npub
                 })
@@ -199,7 +236,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
         return Err(
-            "Uso: mostro-community-api [import-identity|derive-public-identity|export-backup|verify-backup <archivo>|restore-backup <archivo> <directorio-nuevo>|auto-backup [directorio]|stage-mostro-settings <origen-gRPC-LND>|render-settings <community.json|preset:ID> [origen-gRPC-LND]|activate-daemon <origen-gRPC-LND>|deactivate-daemon|daemon-status|simulate-trade [happy-path|dispute-buyer|dispute-seller|cancel] [sats]|mock-relay <bind-addr>|connection-info|check-lnd|check-mostro|lnd-tunnel]".into(),
+            "Uso: mostro-community-api [import-identity|derive-public-identity|export-backup|verify-backup <archivo>|restore-backup <archivo> <directorio-nuevo>|auto-backup [directorio]|stage-mostro-settings <origen-gRPC-LND>|render-settings <community.json|preset:ID> [origen-gRPC-LND]|restore-db <archivo> <destino>|open-orders [mostro.db]|db-check [mostro.db]|activate-daemon <origen-gRPC-LND>|deactivate-daemon|daemon-status|simulate-trade [happy-path|dispute-buyer|dispute-seller|cancel] [sats]|mock-relay <bind-addr>|connection-info|check-lnd|check-mostro|lnd-tunnel]".into(),
         );
     }
 

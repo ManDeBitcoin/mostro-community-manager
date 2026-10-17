@@ -114,6 +114,8 @@ export type DaemonReport = {
   /** Recent, but older than the process running now: the previous one published it. */
   announced_before_start?: boolean;
   last_exit?: { at_unix: number; code: number; uptime_secs: number } | null;
+  /** Orders not finished in the daemon's database; null without a database. */
+  open_orders?: { in_flight: number; pending: number; by_status: Record<string, number> } | null;
 };
 export type DaemonNotice = { code: string; text: string };
 export type NodeInfo = {
@@ -204,6 +206,8 @@ export type BackupEntry = {
   path: string;
   size_bytes: number;
   modified_timestamp: number;
+  /** `rules` (identity and rules) or `database` (the daemon's database). */
+  kind?: 'rules' | 'database' | string;
 };
 
 export type AutoBackupState = {
