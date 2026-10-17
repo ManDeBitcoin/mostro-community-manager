@@ -1,3 +1,7 @@
+# Mostro Community Manager v1.0.16
+
+- El Manager pasa a tener licencia: GPL-3.0-or-later, la misma que el daemon mostrod que incluye. Copyright (C) 2026 Man De Bitcoin. El texto va en `LICENSE` y, dentro de la imagen, en `/usr/share/licenses/mostro-community-manager/`.
+
 # Mostro Community Manager v1.0.15
 
 - Nuevo en Configuración, Identidad de la comunidad: **Imagen de la comunidad**. Es el enlace a una imagen cuadrada (se recomienda 128x128 px) que el daemon publica en el perfil del nodo en Nostr (evento kind 0, campo `picture`). Las apps de Mostro la muestran junto al nombre del nodo, por ejemplo al elegir comunidad.

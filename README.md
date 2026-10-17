@@ -71,3 +71,11 @@ Las imágenes GHCR deben ser públicas para que Umbrel pueda descargarlas sin cr
 [Resolver errores de Mostrix y discrepancias con el daemon](docs/mostrix-troubleshooting.md).
 
 [Identidad y respaldos](docs/identity.md) · [LND de Umbrel](docs/lnd.md) · [Revisión previa de Mostro](docs/mostro-preflight.md) · [Convivencia con una instancia existente](docs/coexistence.md)
+
+## Licencia
+
+Copyright (C) 2026 Man De Bitcoin.
+
+Mostro Community Manager es software libre: puedes redistribuirlo y modificarlo bajo los términos de la [GNU General Public License](LICENSE) publicada por la Free Software Foundation, versión 3 o (a tu elección) cualquier versión posterior (GPL-3.0-or-later). Se distribuye sin ninguna garantía; consulta la licencia para los detalles.
+
+La imagen incluye el daemon oficial `mostrod` del proyecto [MostroP2P](https://github.com/MostroP2P/mostro), sin modificar y también GPL-3.0-or-later. Su licencia y su aviso van en `/usr/share/licenses/mostrod/` dentro de la imagen; ver [`config/upstream/NOTICE-mostrod.md`](config/upstream/NOTICE-mostrod.md).

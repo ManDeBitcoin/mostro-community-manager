@@ -31,10 +31,12 @@ RUN cargo fmt --all -- --check && cargo test --workspace --locked && cargo clipp
 FROM debian:bookworm-slim
 LABEL org.opencontainers.image.source="https://github.com/ManDeBitcoin/mostro-community-umbrel"
 LABEL org.opencontainers.image.title="Mostro Community Manager"
+LABEL org.opencontainers.image.licenses="GPL-3.0-or-later"
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl ncurses-base procps && rm -rf /var/lib/apt/lists/*
 COPY --from=api /src/target/release/mostro-community-api /usr/local/bin/mostro-community-api
 COPY --from=download /mostrod /usr/local/bin/mostrod
 # mostrod is GPL-3.0-or-later since v0.19.2: ship its license and source pointer.
+COPY LICENSE /usr/share/licenses/mostro-community-manager/LICENSE
 COPY config/upstream/LICENSE-GPL-3.0-or-later /usr/share/licenses/mostrod/LICENSE
 COPY config/upstream/LICENSE-MIT /usr/share/licenses/mostrod/LICENSE-MIT
 COPY config/upstream/NOTICE-mostrod.md /usr/share/licenses/mostrod/NOTICE.md

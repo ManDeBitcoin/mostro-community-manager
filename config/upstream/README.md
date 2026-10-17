@@ -16,7 +16,7 @@ Mostro pasó de MIT a GPL-3.0-or-later en v0.19.2. Entre v0.19.0 y v0.20.0 la pl
 
 La prueba `embedded_template_is_equivalent_to_the_pinned_upstream_release` en `api/tests/configuration.rs` compara ambas plantillas ya analizadas, sin `[health]`, comprueba que los valores de `[health]` sean esos valores por defecto y que el proto solo difiera en `RevokeReputationImports`. Falla si upstream cambia cualquier otra cosa.
 
-Cuando una versión futura cambie la plantilla de verdad habrá que decidir entre compilar la copia GPL, lo que condiciona la licencia de la API, o mantener una plantilla propia. Lo mismo si se quiere configurar `[health]` (por ejemplo un `watchdog_pubkey`) desde el panel.
+Desde la v1.0.16 el Manager es GPL-3.0-or-later (archivo `LICENSE` en la raíz del repositorio), igual que mostrod, así que compilar la plantilla GPL de la versión fijada ya no condiciona su licencia. La plantilla MIT de v0.19.0 se mantiene solo hasta que el renderer pase a usar la de la versión fijada.
 
 ## El binario `mostrod`
 
