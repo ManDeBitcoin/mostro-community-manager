@@ -1,4 +1,4 @@
-name: Check Umbrel image
+name: Check image
 # Builds and smoke-tests the image a pull request would ship, without
 # publishing anything. The same build only ran on release tags before, so a
 # broken Dockerfile was first seen after the tag existed.
@@ -47,7 +47,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     env:
-      IMAGE: mostro-community-umbrel:check-${{ matrix.arch }}
+      IMAGE: mostro-community-manager:check-${{ matrix.arch }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
@@ -57,7 +57,7 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
         with:
           context: .
-          file: docker/Dockerfile.umbrel
+          file: docker/Dockerfile
           platforms: linux/${{ matrix.arch }}
           build-args: |
             MANAGER_VERSION=v0.0.0-check

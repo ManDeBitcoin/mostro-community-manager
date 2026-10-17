@@ -20,7 +20,7 @@ Desde la v1.0.16 el Manager es GPL-3.0-or-later (archivo `LICENSE` en la raíz d
 
 ## El binario `mostrod`
 
-La imagen Docker descarga el binario oficial sin modificar desde la release de GitHub y comprueba su SHA-256 (ver `config/versions.json` y `docker/Dockerfile.umbrel`). Desde v0.19.2 ese binario es GPL-3.0-or-later. La imagen incluye el texto de la licencia y este aviso en `/usr/share/licenses/mostrod/`. El código fuente correspondiente es el tag de la versión fijada:
+La imagen Docker descarga el binario oficial sin modificar desde la release de GitHub y comprueba su SHA-256 (ver `config/versions.json` y `docker/Dockerfile`). Desde v0.19.2 ese binario es GPL-3.0-or-later. La imagen incluye el texto de la licencia y este aviso en `/usr/share/licenses/mostrod/`. El código fuente correspondiente es el tag de la versión fijada:
 
 <https://github.com/MostroP2P/mostro/tree/v0.20.0>
 

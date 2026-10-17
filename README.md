@@ -1,21 +1,20 @@
-# Mostro Community Manager for Umbrel
+# Mostro Community Manager
 
 <img src="assets/logo.png" alt="Mostro Community Manager" width="720">
 
-Panel de operador para configurar una comunidad P2P sobre Mostro y Lightning, activar el daemon y supervisar órdenes, liquidez y mediación. **Versión del manifiesto de Umbrel: 1.0.15.**
+Panel de operador para configurar una comunidad P2P sobre Mostro y Lightning, activar el daemon y supervisar órdenes, liquidez y mediación.
+
+Este repositorio es el código: la API, el panel y la imagen `ghcr.io/mandebitcoin/mostro-community-manager`, que incluye el daemon oficial Mostro (v0.20.0 desde la versión 1.0.14 del Manager, v0.19.2 de la 1.0.12 a la 1.0.13, v0.19.0 en la 1.0.11). La imagen también se publica con su nombre anterior, `ghcr.io/mandebitcoin/mostro-community-umbrel`.
 
 ## Instalar en Umbrel
 
-Este repositorio también es una tienda comunitaria de una sola aplicación.
+La app se instala desde la tienda comunitaria [ManDeBitcoin/mostro-community-umbrel](https://github.com/ManDeBitcoin/mostro-community-umbrel), que tiene sus pasos:
 
 1. En Umbrel, abrir **App Store → Community App Stores / Tiendas comunitarias**.
 2. Añadir `https://github.com/ManDeBitcoin/mostro-community-umbrel`.
 3. Instalar **Mostro Community Manager**.
-4. Comprobar que la ficha muestre **1.0.15** y abrirlo desde Umbrel.
 
 ID estable de la aplicación: `mandebitcoin-mostro-manager`. Puerto del panel: `5173`, gestionado por `app_proxy`. No configurar un proxy público directo al contenedor. Datos exclusivos en `${APP_DATA_DIR}/data/config`.
-
-El paquete está en [`mandebitcoin-mostro-manager/`](mandebitcoin-mostro-manager/); los archivos de la raíz son para desarrollo. Depende de la app Lightning de Umbrel y empaqueta el daemon oficial Mostro: v0.20.0 desde la versión 1.0.14 del Manager, v0.19.2 de la 1.0.12 a la 1.0.13, v0.19.0 en la 1.0.11.
 
 ## Si ya tienes Mostro funcionando
 
@@ -52,11 +51,11 @@ Abrir `http://127.0.0.1:5173`. Los datos locales se guardan en `var/config/`, ig
 
 ```sh
 ./scripts/check.sh
-docker build -f docker/Dockerfile.umbrel -t mostro-community:preview .
+docker build -f docker/Dockerfile -t mostro-community:preview .
 ./scripts/container-smoke.sh mostro-community:preview
 ```
 
-El script de contenedor utiliza datos temporales; comprueba UI, CSP, guardado y persistencia tras reinicio. El workflow [`publish.yml`](.github/workflows/publish.yml) compila y prueba imágenes nativas amd64 y arm64 al publicar un tag `v*`. Solo después de verificar que GHCR las entrega sin credenciales promueve la nueva versión en la tienda. Ver el [proceso de publicación](docs/release-process.md) antes de crear un tag.
+El script de contenedor utiliza datos temporales; comprueba UI, CSP, guardado y persistencia tras reinicio. El workflow [`publish.yml`](.github/workflows/publish.yml) compila y prueba imágenes nativas amd64 y arm64 al publicar un tag `v*`. Solo después de verificar que GHCR las entrega sin credenciales abre el PR que promueve la nueva versión en el repositorio de la tienda. Ver el [proceso de publicación](docs/release-process.md) antes de crear un tag.
 
 Las imágenes GHCR deben ser públicas para que Umbrel pueda descargarlas sin credenciales. La visibilidad del repositorio no convierte automáticamente sus paquetes en públicos.
 

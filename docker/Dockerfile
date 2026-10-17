@@ -29,7 +29,7 @@ ARG MANAGER_VERSION=dev
 ENV MANAGER_VERSION=$MANAGER_VERSION
 RUN cargo fmt --all -- --check && cargo test --workspace --locked && cargo clippy --workspace --all-targets --locked -- -D warnings && cargo build --locked --release -p mostro-community-api
 FROM debian:bookworm-slim
-LABEL org.opencontainers.image.source="https://github.com/ManDeBitcoin/mostro-community-umbrel"
+LABEL org.opencontainers.image.source="https://github.com/ManDeBitcoin/mostro-community-manager"
 LABEL org.opencontainers.image.title="Mostro Community Manager"
 LABEL org.opencontainers.image.licenses="GPL-3.0-or-later"
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl ncurses-base procps && rm -rf /var/lib/apt/lists/*

@@ -389,7 +389,7 @@ fn every_pin_of_the_daemon_release_agrees() {
 
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let read = |relative: &str| std::fs::read_to_string(root.join(relative)).ok();
-    for dockerfile in ["docker/Dockerfile.umbrel", "docker/Dockerfile.mostro"] {
+    for dockerfile in ["docker/Dockerfile", "docker/Dockerfile.mostro"] {
         if let Some(text) = read(dockerfile) {
             assert!(
                 text.contains(&format!("/releases/download/v{version}/")),

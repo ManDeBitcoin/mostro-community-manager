@@ -1,4 +1,9 @@
-name: Build and publish Umbrel release
+name: Build and publish release
+# A `v*` tag builds and tests both architectures, publishes the image under
+# its name and under the name the Umbrel store used before the code moved
+# here, and then promotes the release in the store repository through a pull
+# request. The store keeps its own release tooling (scripts/release_metadata.py
+# and scripts/verify-public-image.py), checked out next to this repository.
 on:
   push:
     tags: ['v*']
@@ -6,17 +11,25 @@ permissions:
   contents: read
   packages: write
 concurrency:
-  group: umbrel-release
+  group: release
   cancel-in-progress: false
+env:
+  IMAGE: ghcr.io/mandebitcoin/mostro-community-manager
+  LEGACY_IMAGE: ghcr.io/mandebitcoin/mostro-community-umbrel
+  STORE_REPOSITORY: ManDeBitcoin/mostro-community-umbrel
 jobs:
   preflight:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Test release metadata gate
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ env.STORE_REPOSITORY }}
+          path: store
+      - name: Test release tooling
         run: python3 -m unittest discover -s scripts/tests
       - name: Reject store version bumps before the image exists
-        run: python3 scripts/release_metadata.py check-candidate "$GITHUB_REF_NAME"
+        run: python3 store/scripts/release_metadata.py check-candidate "$GITHUB_REF_NAME" --notes-file docs/release-notes.md
   build:
     needs: preflight
     strategy:
@@ -28,6 +41,8 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
+    env:
+      ARCH_IMAGE: ghcr.io/mandebitcoin/mostro-community-manager:sha-${{ github.sha }}-${{ matrix.arch }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
@@ -40,53 +55,52 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
         with:
           context: .
-          file: docker/Dockerfile.umbrel
+          file: docker/Dockerfile
           platforms: linux/${{ matrix.arch }}
           build-args: |
             MANAGER_VERSION=${{ github.ref_name }}
           load: true
-          tags: ghcr.io/mandebitcoin/mostro-community-umbrel:sha-${{ github.sha }}-${{ matrix.arch }}
+          tags: ${{ env.ARCH_IMAGE }}
           cache-from: type=gha,scope=manager-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=manager-${{ matrix.arch }}
       - name: Test container and persistence
-        env:
-          IMAGE: ghcr.io/mandebitcoin/mostro-community-umbrel:sha-${{ github.sha }}-${{ matrix.arch }}
-        run: ./scripts/container-smoke.sh "$IMAGE"
+        run: ./scripts/container-smoke.sh "$ARCH_IMAGE"
       - name: Verify read-only LND TLS adapter in container
-        env:
-          IMAGE: ghcr.io/mandebitcoin/mostro-community-umbrel:sha-${{ github.sha }}-${{ matrix.arch }}
-        run: python3 scripts/lnd-smoke.py --image "$IMAGE"
+        run: python3 scripts/lnd-smoke.py --image "$ARCH_IMAGE"
       - name: Verify optional Mostro image without starting daemon
         run: bash scripts/verify-mostro-image.sh
       - name: Publish tested architecture
-        env:
-          IMAGE: ghcr.io/mandebitcoin/mostro-community-umbrel:sha-${{ github.sha }}-${{ matrix.arch }}
-        run: docker push "$IMAGE"
+        run: docker push "$ARCH_IMAGE"
   publish:
     needs: build
     runs-on: ubuntu-24.04
     permissions:
       contents: write
       packages: write
-      actions: write
-      pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      # Pushing the promotion branch needs a token that can write to the store.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ env.STORE_REPOSITORY }}
+          path: store
+          token: ${{ secrets.PROMOTION_TOKEN }}
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish multi-architecture manifest
-        env:
-          IMAGE: ghcr.io/mandebitcoin/mostro-community-umbrel
+      - name: Publish multi-architecture manifest under both names
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          docker buildx imagetools create --tag "$IMAGE:$VERSION" "$IMAGE:sha-$GITHUB_SHA-amd64" "$IMAGE:sha-$GITHUB_SHA-arm64"
+          docker buildx imagetools create --tag "$IMAGE:$VERSION" --tag "$LEGACY_IMAGE:$VERSION" \
+            "$IMAGE:sha-$GITHUB_SHA-amd64" "$IMAGE:sha-$GITHUB_SHA-arm64"
           docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{json .Manifest}}' > image-manifest.json
       - name: Verify anonymous registry access
-        run: python3 scripts/verify-public-image.py "${GITHUB_REF_NAME#v}"
+        run: |
+          python3 store/scripts/verify-public-image.py --repository mandebitcoin/mostro-community-manager "${GITHUB_REF_NAME#v}"
+          python3 store/scripts/verify-public-image.py --repository mandebitcoin/mostro-community-umbrel "${GITHUB_REF_NAME#v}"
       - name: Create preview release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -98,27 +112,25 @@ jobs:
           fi
       - name: Promote verified image in the Umbrel store
         env:
-          GH_TOKEN: ${{ secrets.PROMOTION_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PROMOTION_TOKEN }}
+        working-directory: store
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
-          CURRENT_VERSION="$(python3 -c 'from scripts.release_metadata import current_version; print(current_version())')"
-          cp docs/release-notes.md "$RUNNER_TEMP/mostro-release-notes.md"
-          git fetch origin main:refs/remotes/origin/main
-          git switch -C release-promotion origin/main
-          if [ "$(python3 -c 'from scripts.release_metadata import current_version; print(current_version())')" = "$VERSION" ]; then
+          current_version() { python3 -c 'import sys; sys.path.insert(0, "scripts"); from release_metadata import current_version; print(current_version())'; }
+          if [ "$(current_version)" = "$VERSION" ]; then
             python3 scripts/release_metadata.py check-store
             exit 0
           fi
-          python3 scripts/release_metadata.py promote "$GITHUB_REF_NAME" --expected-current "$CURRENT_VERSION" --notes-file "$RUNNER_TEMP/mostro-release-notes.md"
+          python3 scripts/release_metadata.py promote "$GITHUB_REF_NAME" --expected-current "$(current_version)" --notes-file "$GITHUB_WORKSPACE/docs/release-notes.md"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add README.md mandebitcoin-mostro-manager/umbrel-app.yml mandebitcoin-mostro-manager/docker-compose.yml
           git commit -m "release: promote $GITHUB_REF_NAME in Umbrel store"
           PROMOTION_BRANCH="release-promotion-$VERSION-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           git push origin "HEAD:refs/heads/$PROMOTION_BRANCH"
-          PR_URL="$(gh pr create --base main --head "$PROMOTION_BRANCH" --title "release: promote $GITHUB_REF_NAME in Umbrel store" --body "Automated promotion for $GITHUB_REF_NAME in Umbrel store")"
-          for attempt in $(seq 1 15); do
+          PR_URL="$(gh pr create --repo "$STORE_REPOSITORY" --base main --head "$PROMOTION_BRANCH" --title "release: promote $GITHUB_REF_NAME in Umbrel store" --body "Automated promotion of $GITHUB_REF_NAME, published by https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")"
+          for _ in $(seq 1 15); do
             if [ -n "$(gh pr checks "$PR_URL" --json name -q '.[].name' 2>/dev/null)" ]; then
               break
             fi
