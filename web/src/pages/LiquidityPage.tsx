@@ -252,7 +252,7 @@ export function LiquidityOperationsPage({
           <li>
             <strong>Consigue liquidez entrante.</strong>
             <span>
-              Es la que suele faltar en un nodo nuevo. Puedes comprar un canal entrante a un proveedor de liquidez o en un mercado como Amboss Magma, o pedir a otro nodo que abra un canal hacia el tuyo. El canal tiene que abrirse en el nodo LND de tu Umbrel, que es el que usa Mostro: una app con su propio nodo Lightning no sirve para esto. Como referencia, ten varias veces el importe de tu operación máxima: cada operación en curso ocupa su importe hasta que se cierra, y las garantías ocupan el suyo.
+              Es la que suele faltar en un nodo nuevo. Puedes comprar un canal entrante a un proveedor de liquidez o en un mercado como Amboss Magma, o pedir a otro nodo que abra un canal hacia el tuyo. El canal tiene que abrirse en el nodo LND que usa Mostro: una app con su propio nodo Lightning no sirve para esto. Como referencia, ten varias veces el importe de tu operación máxima: cada operación en curso ocupa su importe hasta que se cierra, y las garantías ocupan el suyo.
             </span>
           </li>
           <li>

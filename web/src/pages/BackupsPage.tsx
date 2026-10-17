@@ -4,12 +4,28 @@ import { api } from '../lib/api';
 import { formatDateTime } from '../lib/format';
 import { Badge, Callout, EmptyState, Fact, FactGrid, PageHeader, Panel } from '../components/layout';
 
-// On Umbrel the API lives in the app's `web` container; this is how one of its commands is run there.
+// The API lives in the `web` container: on Umbrel, the app's; with Docker, the
+// `web` service of the installation's compose project. This is how one of its
+// commands is run, and a file copied out, on each.
 const UMBREL_CONTAINER = 'mandebitcoin-mostro-manager_web_1';
-const DOCKER_EXEC = `sudo docker exec -it --user 1000:1000 ${UMBREL_CONTAINER} mostro-community-api`;
+const COMMANDS = {
+  umbrel: {
+    exec: `sudo docker exec -it --user 1000:1000 ${UMBREL_CONTAINER} mostro-community-api`,
+    copy: (path: string) => `sudo docker cp ${UMBREL_CONTAINER}:${path} .`,
+    copyNote: 'En Umbrel, para copiar uno a la carpeta actual por SSH:',
+    autoNote: 'El paquete de Umbrel no la define: en Umbrel los respaldos se crean a mano.',
+  },
+  docker: {
+    exec: 'docker compose exec web mostro-community-api',
+    copy: (path: string) => `docker compose cp web:${path} .`,
+    copyNote: 'Para copiar uno a la carpeta actual, desde la carpeta de la instalación:',
+    autoNote: 'Defínela en el entorno del servicio web y vuelve a crear el contenedor.',
+  },
+};
 
 export function BackupsPage({ data }: { data: PanelData }) {
   const { backups, refreshBackups } = data;
+  const commands = COMMANDS[data.health?.platform === 'umbrel' ? 'umbrel' : 'docker'];
   const backupDir = (backups?.target_dir || '/data/backup').replace(/\/$/, '');
   const [running, setRunning] = useState(false);
   const [passphrase, setPassphrase] = useState('');
@@ -73,7 +89,7 @@ export function BackupsPage({ data }: { data: PanelData }) {
           <>
             {!backups.enabled && (
               <p className="panel-note">
-                Se activa cuando el servicio arranca con la frase de cifrado en la variable de entorno <code>BACKUP_PASSPHRASE</code>. El paquete de Umbrel no la define: en Umbrel los respaldos se crean a mano.
+                Se activa cuando el servicio arranca con la frase de cifrado en la variable de entorno <code>BACKUP_PASSPHRASE</code>. {commands.autoNote}
               </p>
             )}
             {backups.last_error && backups.enabled && <Callout tone="warn" title="El último intento falló">{backups.last_error}</Callout>}
@@ -110,8 +126,8 @@ export function BackupsPage({ data }: { data: PanelData }) {
                 </li>
               ))}
             </ul>
-            <p className="panel-note">Un respaldo que vive en el mismo disco no protege de perderlo. En Umbrel, para copiar uno a la carpeta actual por SSH:</p>
-            <code className="command">sudo docker cp {UMBREL_CONTAINER}:{backupDir}/{backups.backups[0].filename} .</code>
+            <p className="panel-note">Un respaldo que vive en el mismo disco no protege de perderlo. {commands.copyNote}</p>
+            <code className="command">{commands.copy(`${backupDir}/${backups.backups[0].filename}`)}</code>
           </>
         ) : backups ? (
           <EmptyState icon="save" title="No hay ningún respaldo en esta carpeta">
@@ -126,15 +142,15 @@ export function BackupsPage({ data }: { data: PanelData }) {
         <ol className="step-list">
           <li>
             <strong>Comprueba que el archivo se abre con tu frase.</strong>
-            <code className="command">{DOCKER_EXEC} verify-backup {backupDir}/&lt;archivo.age&gt;</code>
+            <code className="command">{commands.exec} verify-backup {backupDir}/&lt;archivo.age&gt;</code>
           </li>
           <li>
             <strong>Restaura en una carpeta que aún no exista.</strong>
-            <code className="command">{DOCKER_EXEC} restore-backup {backupDir}/&lt;archivo.age&gt; {backupDir}/restaurado</code>
+            <code className="command">{commands.exec} restore-backup {backupDir}/&lt;archivo.age&gt; {backupDir}/restaurado</code>
           </li>
           <li>
             <strong>La base del daemon se restaura aparte</strong>, en un archivo que aún no exista; se comprueba su integridad antes de escribirlo.
-            <code className="command">{DOCKER_EXEC} restore-db {backupDir}/mostro-db-&lt;…&gt;.age {backupDir}/mostro.db</code>
+            <code className="command">{commands.exec} restore-db {backupDir}/mostro-db-&lt;…&gt;.age {backupDir}/mostro.db</code>
           </li>
         </ol>
         <p className="panel-note">

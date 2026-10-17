@@ -8,6 +8,7 @@ import { useCommunityEditor } from './hooks/useCommunityEditor';
 import { useSimulator } from './hooks/useSimulator';
 import { useIdentity } from './hooks/useIdentity';
 import { useDialogFocus } from './hooks/useDialogFocus';
+import { useAuth } from './hooks/useAuth';
 import { Icon } from './components/ui';
 import { Callout } from './components/layout';
 import { IdentityModals } from './components/IdentityModals';
@@ -21,6 +22,7 @@ import { ConfigPage } from './pages/ConfigPage';
 import { BackupsPage } from './pages/BackupsPage';
 import { AlertsPage } from './pages/AlertsPage';
 import { SimulatorPage } from './pages/SimulatorPage';
+import { LoginPage } from './pages/LoginPage';
 
 type Flash = { tone: 'good' | 'bad'; text: string };
 
@@ -33,7 +35,16 @@ const readSeenAt = () => {
   }
 };
 
+// The panel is only mounted once the server lets it in, so nothing polls behind the login page.
 function App() {
+  const auth = useAuth();
+  if (!auth.session && !auth.unreachable) return null;
+  // Unreachable: the panel shows that on its own, and the first answer that asks for a login brings it here.
+  if (auth.session && !auth.session.authenticated) return <LoginPage onLogin={auth.login} />;
+  return <Panel onLogout={auth.session?.mode === 'password' ? auth.logout : undefined} />;
+}
+
+function Panel({ onLogout }: { onLogout?: () => Promise<void> }) {
   const [route, navigate] = useRoute();
   const page = route.page;
   const data = usePanelData();
@@ -265,6 +276,15 @@ function App() {
             {version ? `Manager ${version}` : 'Manager en desarrollo'}
             {health?.mostro_pinned_version ? ` · mostrod ${health.mostro_pinned_version}` : ''}
           </span>
+          {onLogout && (
+            <button
+              type="button"
+              className="side-logout"
+              onClick={() => void onLogout().catch((err) => setFlash({ tone: 'bad', text: err instanceof Error ? err.message : 'No se pudo cerrar la sesión.' }))}
+            >
+              Cerrar sesión
+            </button>
+          )}
         </div>
       </aside>
       <button type="button" className="side-scrim" aria-label="Cerrar el menú" tabIndex={menuOpen ? 0 : -1} onClick={() => setMenuOpen(false)} />

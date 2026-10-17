@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AutoBackupState, CardPublication, ConnectionInfo, DaemonReport, Dashboard, NotificationItem, OrdersSnapshot } from '../types';
 import { api } from '../lib/api';
 
-export type Health = { status: string; version?: string; mode?: string; mostro_pinned_version?: string };
+export type Health = { status: string; version?: string; mode?: string; mostro_pinned_version?: string; auth?: string; platform?: 'umbrel' | 'docker' };
 
 /** How often the live state is read again while the panel is visible. */
 const LIVE_INTERVAL_MS = 20_000;

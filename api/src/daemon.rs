@@ -581,7 +581,7 @@ pub async fn report_with_node_info(
         ));
     }
     if state == DaemonState::ActiveReady && !crash_looping {
-        notices.push(DaemonNotice::new("daemon_not_verified", "Configuración guardada, pero ejecución del daemon sin verificar. En Umbrel el daemon está en otro contenedor; guardar settings.toml no confirma su arranque ni la versión que reciben los clientes."));
+        notices.push(DaemonNotice::new("daemon_not_verified", "Configuración guardada, pero ejecución del daemon sin verificar. El daemon corre en otro contenedor; guardar settings.toml no confirma su arranque ni la versión que reciben los clientes."));
     }
     if state == DaemonState::ActiveRunning
         && !announced_fresh

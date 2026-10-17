@@ -18,6 +18,9 @@ services:
     image: mostro-community-api:0.1.0-dev
     volumes:
       - ./var:/data
+    environment:
+      # Only the web container reaches it, and that one only listens on 127.0.0.1.
+      PANEL_AUTH: external
     security_opt: ["no-new-privileges:true"]
     networks: [admin]
 networks:

@@ -237,6 +237,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let bind = std::env::var("API_BIND").unwrap_or_else(|_| "127.0.0.1:3001".into());
+    // Before anything else: a panel that would be reachable without a login does not start.
+    let auth = match mostro_community_api::auth::PanelAuth::from_env(&bind) {
+        Ok(auth) => Arc::new(auth),
+        Err(reason) => {
+            eprintln!("{reason}");
+            std::process::exit(1);
+        }
+    };
     let root = PathBuf::from(std::env::var("CONFIG_DIR").unwrap_or_else(|_| "./var/config".into()));
     let store = Arc::new(Mutex::new(Store::open(root.clone())?));
 
@@ -394,10 +402,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         backup_state,
         rate_limiter,
         card_publication,
+        auth: auth.clone(),
     };
     let listener = tokio::net::TcpListener::bind(&bind).await?;
     let local_addr = listener.local_addr()?;
-    eprintln!("Community API listening on {local_addr}");
+    eprintln!(
+        "Community API listening on {local_addr} (acceso: {})",
+        auth.mode().as_str()
+    );
     let app = if let Some(directory) = std::env::var_os("STATIC_DIR") {
         use axum::http::{HeaderValue, header};
         use tower_http::{
