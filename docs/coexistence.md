@@ -1,16 +1,14 @@
 # Convivencia con una instancia Mostro existente
 
-## Qué instala esta release
+## Qué instala el Manager
 
-- App ID: `mandebitcoin-mostro-manager`; nombres de contenedores distintos de Mostro.
-- Puerto del panel: `5173` a través de `app_proxy`; sin publicación directa de API/RPC.
-- Datos: solo el directorio propio `${APP_DATA_DIR}/data`.
-- Servicios: `app_proxy`, inicialización de permisos de datos y Manager (UI + API).
-- Red `manager_private` interna. `app_proxy` y un puente TCP de destino fijo conectan también a la red de Umbrel; la API del panel permanece en la red privada.
+- Su propio daemon `mostrod` (el binario oficial), que espera sin hacer nada hasta que lo actives en el panel. No reutiliza la identidad, la configuración ni la base de datos de otra instancia.
+- En Umbrel: app `mandebitcoin-mostro-manager`, con contenedores de nombres distintos de cualquier otra instalación de Mostro; panel en el puerto `5173` a través de `app_proxy`; datos solo en `${APP_DATA_DIR}/data`. La API vive en la red interna `manager_private`; `app_proxy` y un puente TCP de destino fijo hacia el REST de LND la conectan con la red de Umbrel, y el puente no recibe credenciales.
+- Con Docker ([`deploy/compose`](../deploy/compose) o [`deploy/nodo-completo`](../deploy/nodo-completo)): un proyecto de Compose propio, con su nombre (`COMPOSE_PROJECT_NAME`) y sus carpetas. El nodo completo instala además Bitcoin Core y LND; `deploy/compose` usa un LND que ya tienes.
 
-No incluye Mostro, Bitcoin, LND, Watchdog, relay ni Push. No monta socket Docker, configuración existente ni base de datos de Mostro. La API lee únicamente `tls.cert` y `readonly.macaroon` de LND; el puente de red no recibe credenciales. El `nsec` importado pertenece al almacenamiento del Manager y no se expone por HTTP. Instalar o desinstalar el Manager no debe reiniciar ni cambiar esos otros servicios.
+No incluye Watchdog, relay ni Push. No monta el socket de Docker ni la configuración o la base de datos de otro Mostro. El panel lee de LND solo `tls.cert` y `readonly.macaroon`; el daemon usa el macaroon que le des (en Umbrel, `admin.macaroon`). El `nsec` importado pertenece al almacenamiento del Manager y no se expone por HTTP. Instalar o desinstalar el Manager no reinicia ni cambia los servicios que ya tenías.
 
-La disponibilidad de `5173` se debe comprobar en cada servidor antes de instalar. Si hay un conflicto real, cambiar `port` en el manifest antes de instalar; los puertos internos 3001 de distintos contenedores no son por sí mismos un conflicto.
+Comprueba antes de instalar que el puerto del panel (`5173` por defecto) esté libre en el equipo. En Umbrel, si hay un conflicto real, cambia `port` en el manifiesto; con Docker, `PANEL_PORT` en `.env`. Los puertos internos 3001 de distintos contenedores no son por sí mismos un conflicto.
 
 ## Cómo conectar el Mostro actual en una etapa posterior
 

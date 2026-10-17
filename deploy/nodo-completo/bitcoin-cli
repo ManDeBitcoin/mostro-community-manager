@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# bitcoin-cli dentro del contenedor de bitcoind. Ejemplo: ./bitcoin-cli getblockchaininfo
+set -euo pipefail
+cd "$(dirname "$0")"
+t=(); [ -t 0 ] || t=(-T)
+exec docker compose exec "${t[@]}" bitcoind bitcoin-cli "$@"

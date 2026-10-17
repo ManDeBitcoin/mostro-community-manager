@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# lncli dentro del contenedor de LND. Ejemplos: ./lncli create | ./lncli getinfo
+set -euo pipefail
+cd "$(dirname "$0")"
+t=(); [ -t 0 ] || t=(-T)
+exec docker compose exec "${t[@]}" lnd lncli \
+  --tlscertpath /export/ro/tls.cert --macaroonpath /export/admin.macaroon "$@"

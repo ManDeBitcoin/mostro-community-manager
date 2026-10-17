@@ -1,0 +1,164 @@
+# Nodo completo para una comunidad Mostro: Bitcoin Core, LND y el Mostro
+# Community Manager (panel y daemon mostrod) en un solo proyecto.
+# Guía: docs/instalar-nodo-completo.md. Actualizar el Manager: ../actualizar.sh X.Y.Z
+#
+# No edites este archivo: cada actualización del Manager lo cambia por el de la
+# versión nueva. Lo propio de tu instalación va en .env y, si hace falta, en
+# docker-compose.override.yml (no se versiona).
+#
+# Carpetas, junto a este archivo (las crea ./preparar.sh):
+#   data/bitcoind/     cadena de bloques y bitcoin.conf
+#   data/lnd/          billetera, canales y lnd.conf (lleva la contraseña RPC)
+#   data/lnd-export/   lo que LND comparte: ro/tls.cert y ro/readonly.macaroon
+#                      (panel), admin.macaroon (mostrod)
+#   data/mostro/       identidad, reglas, base de datos de mostrod y respaldos
+#   secrets/lnd/       wallet-password, la contraseña de la billetera de LND
+#   secrets/panel/     panel_password, la contraseña del panel
+#
+# Coolify: pega este archivo como recurso "Docker Compose" cambiando cada ./
+# de los volúmenes por la ruta absoluta de la carpeta, y sin dominio en ningún
+# servicio. Ver la guía.
+name: ${COMPOSE_PROJECT_NAME:-mostro-nodo}
+
+services:
+  bitcoind:
+    image: ghcr.io/getumbrel/docker-bitcoind:v31.1@sha256:e0a94f8390f4fee796faba306719860a1ba61e8fa841416bca26fd4e1e94cb8c
+    user: "1000:1000"
+    restart: unless-stopped
+    stop_grace_period: 3m
+    volumes:
+      - ./data/bitcoind:/data/.bitcoin
+    mem_limit: ${BITCOIND_MEM_LIMIT:-1200m}
+    memswap_limit: ${BITCOIND_MEM_LIMIT:-1200m}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  lnd:
+    image: lightninglabs/lnd:v0.21.4-beta@sha256:04d06edcc0f6e99a5e797ea34959f330add222226f840cd86afbc31f8f29627d
+    user: "1000:1000"
+    restart: unless-stopped
+    stop_grace_period: 2m
+    depends_on:
+      bitcoind:
+        condition: service_started
+    environment:
+      HOME: /home/lnd
+    volumes:
+      - ./data/lnd:/home/lnd/.lnd
+      - ./data/lnd-export:/export
+      - ./secrets/lnd:/secrets:ro
+    # Puerto P2P de Lightning, para que otros nodos puedan abrirte canales.
+    ports:
+      - "${LND_P2P_BIND:-0.0.0.0}:${LND_P2P_PORT:-9735}:9735"
+    mem_limit: ${LND_MEM_LIMIT:-1536m}
+    memswap_limit: ${LND_MEM_LIMIT:-1536m}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+  # Deja los permisos de data/mostro como los esperan web y mostro (usuario
+  # 1000) y comprueba que esté la contraseña del panel.
+  init:
+    image: ${MCM_IMAGE:?falta MCM_IMAGE en .env}
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        if [ ! -s /secrets/panel_password ]; then
+          echo "Falta secrets/panel/panel_password en la carpeta de la instalacion (ver docs/instalar-nodo-completo.md)" >&2
+          exit 1
+        fi
+        mkdir -p /data/config /data/backup
+        chown -R 1000:1000 /data /secrets
+        chmod 700 /data/config /data/backup /secrets
+        chmod 600 /secrets/panel_password
+    # The image's healthcheck probes the panel, which only the web service runs.
+    healthcheck:
+      disable: true
+    volumes:
+      - ./data/mostro:/data
+      - ./secrets/panel:/secrets
+    network_mode: none
+    restart: "no"
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, FOWNER, DAC_OVERRIDE]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+  # Panel y API. Escucha en 127.0.0.1 salvo que .env diga otra cosa, y pide
+  # la contraseña de secrets/panel/panel_password.
+  web:
+    image: ${MCM_IMAGE:?falta MCM_IMAGE en .env}
+    user: "1000:1000"
+    restart: unless-stopped
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    ports:
+      - "${PANEL_BIND:-127.0.0.1}:${PANEL_PORT:-5173}:3001"
+    environment:
+      MCM_PLATFORM: docker
+      PANEL_PASSWORD_FILE: /run/secrets/panel_password
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      # Lo que el panel consulta de LND, con permiso de solo lectura.
+      LND_REST_URL: https://lnd:8080
+      LND_TLS_CERT: /lnd/tls.cert
+      LND_READONLY_MACAROON: /lnd/readonly.macaroon
+      # Lo que el panel escribe en la configuración de mostrod: rutas como las
+      # ve el contenedor mostro.
+      MOSTRO_LND_GRPC_HOST: https://lnd:10009
+      MOSTRO_LND_CERT_FILE: /lnd/ro/tls.cert
+      MOSTRO_LND_MACAROON_FILE: /lnd/admin.macaroon
+      BACKUP_OFFSITE_DIR: /data/backup
+      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:-}
+    volumes:
+      - ./data/mostro:/data
+      - ./data/lnd-export/ro:/lnd:ro
+      - ./secrets/panel:/run/secrets:ro
+    mem_limit: 256m
+    memswap_limit: 256m
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+  # El daemon mostrod. Espera sin hacer nada hasta que lo actives en el panel.
+  mostro:
+    image: ${MCM_IMAGE:?falta MCM_IMAGE en .env}
+    entrypoint: ["/bin/sh", "/usr/local/bin/mostro-entrypoint"]
+    # The image's healthcheck probes the panel, which only the web service runs.
+    healthcheck:
+      disable: true
+    user: "1000:1000"
+    restart: unless-stopped
+    stop_grace_period: 20s
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    environment:
+      STANDBY_IF_UNCONFIGURED: "true"
+      MOSTRO_SETTINGS_DIR: /data/config/active
+      MOSTRO_IDENTITY_FILE: /data/config/identity/mostro.nsec
+      TERM: xterm
+    volumes:
+      - ./data/mostro:/data
+      - ./data/lnd-export:/lnd:ro
+    mem_limit: 256m
+    memswap_limit: 256m
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging

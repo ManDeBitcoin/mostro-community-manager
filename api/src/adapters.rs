@@ -13,14 +13,22 @@ pub struct Integrations {
     pub lnd_cert: Option<PathBuf>,
     pub lnd_macaroon: Option<PathBuf>,
 }
+/// A variable set to an empty value counts as unset: a compose file declares
+/// the optional ones as `${NAME:-}`.
+fn env(name: &str) -> Option<String> {
+    std::env::var(name)
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+}
+
 impl Integrations {
     pub fn from_env() -> Self {
         Self {
-            mostro_rpc: std::env::var("MOSTRO_RPC_URL").ok(),
-            lnd_rest: std::env::var("LND_REST_URL").ok(),
-            lnd_connect_host: std::env::var("LND_CONNECT_HOST").ok(),
-            lnd_cert: std::env::var_os("LND_TLS_CERT").map(Into::into),
-            lnd_macaroon: std::env::var_os("LND_READONLY_MACAROON").map(Into::into),
+            mostro_rpc: env("MOSTRO_RPC_URL"),
+            lnd_rest: env("LND_REST_URL"),
+            lnd_connect_host: env("LND_CONNECT_HOST"),
+            lnd_cert: env("LND_TLS_CERT").map(Into::into),
+            lnd_macaroon: env("LND_READONLY_MACAROON").map(Into::into),
         }
     }
     pub async fn mostro(&self) -> Value {

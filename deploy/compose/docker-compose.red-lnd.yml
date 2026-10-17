@@ -1,0 +1,14 @@
+# Une web y mostro a la red de Docker donde corre tu LND, para llegar a él por
+# su nombre de servicio (por ejemplo https://lnd:10009). Se activa en .env:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.red-lnd.yml
+#   LND_DOCKER_NETWORK=<la red>   (docker network ls; docker inspect <contenedor de lnd>)
+services:
+  web:
+    networks: [default, lnd]
+  mostro:
+    networks: [default, lnd]
+
+networks:
+  lnd:
+    external: true
+    name: ${LND_DOCKER_NETWORK:?falta LND_DOCKER_NETWORK en .env}

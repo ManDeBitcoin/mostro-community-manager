@@ -6,15 +6,17 @@ Panel de operador para configurar una comunidad P2P sobre Mostro y Lightning, ac
 
 Este repositorio es el código: la API, el panel y la imagen `ghcr.io/mandebitcoin/mostro-community-manager`, que incluye el daemon oficial Mostro (v0.20.0 desde la versión 1.0.14 del Manager, v0.19.2 de la 1.0.12 a la 1.0.13, v0.19.0 en la 1.0.11). La imagen también se publica con su nombre anterior, `ghcr.io/mandebitcoin/mostro-community-umbrel`.
 
-## Instalar en Umbrel
+## Instalar
 
-La app se instala desde la tienda comunitaria [ManDeBitcoin/mostro-community-umbrel](https://github.com/ManDeBitcoin/mostro-community-umbrel), que tiene sus pasos:
+| Plataforma | Qué instala | Guía |
+| --- | --- | --- |
+| Umbrel | El Manager, con el Bitcoin Node y el Lightning Node de Umbrel | [instalar-umbrel.md](docs/instalar-umbrel.md) |
+| Docker, junto a tu LND | El Manager, conectado a un LND que ya tienes | [instalar-docker.md](docs/instalar-docker.md) ([`deploy/compose`](deploy/compose)) |
+| Docker, nodo completo | Bitcoin Core, LND y el Manager en un solo proyecto | [instalar-nodo-completo.md](docs/instalar-nodo-completo.md) ([`deploy/nodo-completo`](deploy/nodo-completo)) |
 
-1. En Umbrel, abrir **App Store → Community App Stores / Tiendas comunitarias**.
-2. Añadir `https://github.com/ManDeBitcoin/mostro-community-umbrel`.
-3. Instalar **Mostro Community Manager**.
+En las tres, el panel se usa igual: [manual de operación](docs/DEPLOYMENT.md). Para cambiar de versión y volver atrás: [actualizar](docs/actualizar.md).
 
-ID estable de la aplicación: `mandebitcoin-mostro-manager`. Puerto del panel: `5173`, gestionado por `app_proxy`. No configurar un proxy público directo al contenedor. Datos exclusivos en `${APP_DATA_DIR}/data/config`.
+En Umbrel la app se instala desde la tienda comunitaria [ManDeBitcoin/mostro-community-umbrel](https://github.com/ManDeBitcoin/mostro-community-umbrel). ID de la aplicación: `mandebitcoin-mostro-manager`; puerto del panel: `5173`, gestionado por `app_proxy`. Con Docker, el panel escucha en `127.0.0.1` y pide contraseña.
 
 ## Si ya tienes Mostro funcionando
 
@@ -56,7 +58,7 @@ docker build -f docker/Dockerfile -t mostro-community:preview .
 ./scripts/daemon-contract-smoke.sh mostro-community:preview
 ```
 
-El script de contenedor utiliza datos temporales; comprueba UI, CSP, guardado y persistencia tras reinicio. El workflow [`publish.yml`](.github/workflows/publish.yml) compila y prueba imágenes nativas amd64 y arm64 al publicar un tag `v*`. Solo después de verificar que GHCR las entrega sin credenciales abre el PR que promueve la nueva versión en el repositorio de la tienda. Ver el [proceso de publicación](docs/release-process.md) antes de crear un tag.
+El script de contenedor utiliza datos temporales; comprueba UI, CSP, login, guardado y persistencia tras reinicio. `scripts/deploy-e2e.sh IMAGEN_A IMAGEN_B` prueba las instalaciones de `deploy/` de punta a punta en regtest, incluida una actualización y su vuelta atrás (ver el [proceso de publicación](docs/release-process.md)). El workflow [`publish.yml`](.github/workflows/publish.yml) compila y prueba imágenes nativas amd64 y arm64 al publicar un tag `v*`. Solo después de verificar que GHCR las entrega sin credenciales abre el PR que promueve la nueva versión en el repositorio de la tienda. Ver el [proceso de publicación](docs/release-process.md) antes de crear un tag.
 
 Las imágenes GHCR deben ser públicas para que Umbrel pueda descargarlas sin credenciales. La visibilidad del repositorio no convierte automáticamente sus paquetes en públicos.
 
@@ -70,7 +72,7 @@ Las imágenes GHCR deben ser públicas para que Umbrel pueda descargarlas sin cr
 
 [Resolver errores de Mostrix y discrepancias con el daemon](docs/mostrix-troubleshooting.md).
 
-[Identidad y respaldos](docs/identity.md) · [LND de Umbrel](docs/lnd.md) · [Revisión previa de Mostro](docs/mostro-preflight.md) · [Convivencia con una instancia existente](docs/coexistence.md)
+[Identidad y respaldos](docs/identity.md) · [LND de Umbrel](docs/lnd.md) · [Actualizar](docs/actualizar.md) · [Revisión previa de Mostro](docs/mostro-preflight.md) · [Convivencia con una instancia existente](docs/coexistence.md)
 
 ## Licencia
 
