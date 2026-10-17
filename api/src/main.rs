@@ -29,6 +29,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
             .map_err(|message| message.into());
         }
+        // The settings.toml the daemon would get from saved rules (a
+        // community.json, or a bare configuration) or from a preset, for
+        // checking it against the real mostrod (scripts/daemon-contract-smoke.sh).
+        if (args.len() == 2 || args.len() == 3) && args[0] == "render-settings" {
+            let config = match args[1].strip_prefix("preset:") {
+                Some(id) => {
+                    mostro_community_api::config::get_regional_presets()
+                        .into_iter()
+                        .find(|preset| preset.id == id)
+                        .ok_or("Plantilla de comisiones desconocida")?
+                        .config
+                }
+                None => {
+                    let bytes = std::fs::read(&args[1])?;
+                    match serde_json::from_slice::<mostro_community_api::config::Configuration>(
+                        &bytes,
+                    ) {
+                        Ok(config) => config,
+                        Err(_) => {
+                            serde_json::from_slice::<mostro_community_api::store::Document>(&bytes)?
+                                .config
+                                .ok_or("Borrador vacío")?
+                        }
+                    }
+                }
+            };
+            let origin = args
+                .get(2)
+                .map(String::as_str)
+                .unwrap_or("https://127.0.0.1:10009");
+            print!(
+                "{}",
+                mostro_community_api::config::render_settings(
+                    &config,
+                    origin,
+                    mostro_community_api::daemon::CERT_PATH,
+                    mostro_community_api::daemon::MACAROON_PATH,
+                )?
+            );
+            return Ok(());
+        }
         if args == ["lnd-tunnel"] {
             return mostro_community_api::tunnel::serve().await;
         }
@@ -158,7 +199,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
         return Err(
-            "Uso: mostro-community-api [import-identity|derive-public-identity|export-backup|verify-backup <archivo>|restore-backup <archivo> <directorio-nuevo>|auto-backup [directorio]|stage-mostro-settings <origen-gRPC-LND>|activate-daemon <origen-gRPC-LND>|deactivate-daemon|daemon-status|simulate-trade [happy-path|dispute-buyer|dispute-seller|cancel] [sats]|mock-relay <bind-addr>|connection-info|check-lnd|check-mostro|lnd-tunnel]".into(),
+            "Uso: mostro-community-api [import-identity|derive-public-identity|export-backup|verify-backup <archivo>|restore-backup <archivo> <directorio-nuevo>|auto-backup [directorio]|stage-mostro-settings <origen-gRPC-LND>|render-settings <community.json|preset:ID> [origen-gRPC-LND]|activate-daemon <origen-gRPC-LND>|deactivate-daemon|daemon-status|simulate-trade [happy-path|dispute-buyer|dispute-seller|cancel] [sats]|mock-relay <bind-addr>|connection-info|check-lnd|check-mostro|lnd-tunnel]".into(),
         );
     }
 

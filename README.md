@@ -53,6 +53,7 @@ Abrir `http://127.0.0.1:5173`. Los datos locales se guardan en `var/config/`, ig
 ./scripts/check.sh
 docker build -f docker/Dockerfile -t mostro-community:preview .
 ./scripts/container-smoke.sh mostro-community:preview
+./scripts/daemon-contract-smoke.sh mostro-community:preview
 ```
 
 El script de contenedor utiliza datos temporales; comprueba UI, CSP, guardado y persistencia tras reinicio. El workflow [`publish.yml`](.github/workflows/publish.yml) compila y prueba imágenes nativas amd64 y arm64 al publicar un tag `v*`. Solo después de verificar que GHCR las entrega sin credenciales abre el PR que promueve la nueva versión en el repositorio de la tienda. Ver el [proceso de publicación](docs/release-process.md) antes de crear un tag.

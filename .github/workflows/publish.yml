@@ -65,6 +65,8 @@ jobs:
           cache-to: type=gha,mode=max,scope=manager-${{ matrix.arch }}
       - name: Test container and persistence
         run: ./scripts/container-smoke.sh "$ARCH_IMAGE"
+      - name: Run the image's mostrod against rendered settings and old databases
+        run: ./scripts/daemon-contract-smoke.sh "$ARCH_IMAGE"
       - name: Verify read-only LND TLS adapter in container
         run: python3 scripts/lnd-smoke.py --image "$ARCH_IMAGE"
       - name: Verify optional Mostro image without starting daemon
