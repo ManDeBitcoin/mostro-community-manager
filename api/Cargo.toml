@@ -22,6 +22,8 @@ tempfile = "3"
 age = "=0.12.1"
 qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }
 sha2 = "0.10"
+# Session tokens of the panel login.
+getrandom = "0.2"
 # The daemon's SQLite database: consistent copies for backups, open orders.
 rusqlite = { version = "0.40.2", features = ["bundled", "backup"] }
 tokio-tungstenite = { version = "0.26.2", features = ["native-tls-vendored"] }

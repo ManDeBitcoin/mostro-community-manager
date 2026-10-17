@@ -1624,6 +1624,7 @@ dependencies = [
  "age",
  "axum 0.8.9",
  "futures-util",
+ "getrandom 0.2.17",
  "http-body-util",
  "nostr",
  "prost",

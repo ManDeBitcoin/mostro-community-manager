@@ -1,5 +1,6 @@
 use crate::{
     adapters::Integrations,
+    auth::{self, AuthMode, LoginError, PanelAuth},
     backup::{self, AutoBackupState},
     card_publication::{CardPublication, PublicationView},
     chat::{self, SharedChatCache},
@@ -12,7 +13,7 @@ use crate::{
 };
 use axum::{
     Json, Router,
-    extract::{ConnectInfo, DefaultBodyLimit, State},
+    extract::{ConnectInfo, DefaultBodyLimit, Extension, State},
     http::{HeaderMap, StatusCode, header},
     middleware::{self, Next},
     response::{
@@ -109,6 +110,7 @@ pub struct AppState {
     /// The worker that publishes the community card runs apart
     /// (`card_publication::CardPublisher`); this is how it is told to look again.
     pub card_publication: CardPublication,
+    pub auth: Arc<PanelAuth>,
 }
 
 impl AppState {
@@ -129,6 +131,7 @@ impl AppState {
             backup_state: Arc::new(tokio::sync::RwLock::new(AutoBackupState::default())),
             rate_limiter: Arc::new(RateLimiter::default()),
             card_publication: CardPublication::default(),
+            auth: Arc::new(PanelAuth::open()),
         }
     }
 }
@@ -136,6 +139,9 @@ impl AppState {
 pub fn router(state: AppState) -> Router {
     let api_routes = Router::new()
         .route("/api/health", get(health))
+        .route("/api/auth/session", get(auth_session_handler))
+        .route("/api/auth/login", post(login_handler))
+        .route("/api/auth/logout", post(logout_handler))
         .route("/api/dashboard", get(dashboard))
         .route("/api/community", get(community).merge(put(save_community)))
         .route("/api/community/card", get(community_card_handler))
@@ -189,6 +195,10 @@ pub fn router(state: AppState) -> Router {
         .merge(api_routes)
         .merge(sse_routes)
         .merge(fallback_route)
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             rate_limit_middleware,
@@ -275,10 +285,15 @@ pub fn client_key(peer: Option<IpAddr>, headers: &HeaderMap, trusted: &[(IpAddr,
         .to_string()
 }
 
+/// Who the request counts against (`client_key`), for the handlers that limit
+/// on their own, like the login.
+#[derive(Clone)]
+struct ClientKey(String);
+
 async fn rate_limit_middleware(
     State(state): State<AppState>,
     headers: HeaderMap,
-    request: axum::extract::Request,
+    mut request: axum::extract::Request,
     next: Next,
 ) -> Result<Response, Response> {
     let peer = request
@@ -299,7 +314,92 @@ async fn rate_limit_middleware(
         return Err(response);
     }
 
+    request.extensions_mut().insert(ClientKey(client_key));
     Ok(next.run(request).await)
+}
+
+/// What answers without a session: enough to show the login page.
+const PUBLIC_PATHS: [&str; 4] = [
+    "/api/health",
+    "/api/auth/session",
+    "/api/auth/login",
+    "/api/auth/logout",
+];
+
+async fn auth_middleware(
+    State(state): State<AppState>,
+    request: axum::extract::Request,
+    next: Next,
+) -> Response {
+    let path = request.uri().path();
+    if !path.starts_with("/api/")
+        || PUBLIC_PATHS.contains(&path)
+        || state.auth.allows(request.headers())
+    {
+        return next.run(request).await;
+    }
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(json!({"error": "Inicia sesión para usar el panel", "login_required": true})),
+    )
+        .into_response()
+}
+
+async fn auth_session_handler(State(state): State<AppState>, headers: HeaderMap) -> Json<Value> {
+    Json(json!({
+        "mode": state.auth.mode().as_str(),
+        "authenticated": state.auth.allows(&headers),
+    }))
+}
+
+#[derive(Deserialize)]
+struct LoginRequest {
+    password: String,
+}
+
+async fn login_handler(
+    State(state): State<AppState>,
+    Extension(ClientKey(client)): Extension<ClientKey>,
+    headers: HeaderMap,
+    Json(payload): Json<LoginRequest>,
+) -> Result<Response, Error> {
+    verify_protection(&headers)?;
+    let token = state
+        .auth
+        .login(&client, &payload.password)
+        .map_err(|reason| match reason {
+            LoginError::NotRequired => {
+                error(StatusCode::BAD_REQUEST, "Este panel no usa contraseña")
+            }
+            LoginError::TooManyAttempts => error(
+                StatusCode::TOO_MANY_REQUESTS,
+                "Demasiados intentos. Espera un minuto y vuelve a probar.",
+            ),
+            LoginError::WrongPassword => error(StatusCode::UNAUTHORIZED, "Contraseña incorrecta"),
+        })?;
+    // verify_protection checked that the origin, when sent, is this panel.
+    let secure = headers
+        .get("origin")
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|origin| origin.starts_with("https://"));
+    Ok((
+        [(header::SET_COOKIE, auth::session_cookie(&token, secure))],
+        Json(json!({"authenticated": true})),
+    )
+        .into_response())
+}
+
+async fn logout_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Response, Error> {
+    verify_protection(&headers)?;
+    state.auth.logout(&headers);
+    Ok((
+        [(header::SET_COOKIE, auth::expired_cookie())],
+        Json(json!({"authenticated": state.auth.mode() != AuthMode::Password})),
+    )
+        .into_response())
 }
 
 pub fn verify_protection(headers: &HeaderMap) -> Result<(), Error> {
@@ -745,7 +845,7 @@ async fn simulation_run_handler(
 
 /// Liveness of the API itself. `version` is the released package version when
 /// the image was built by the release workflow, otherwise the crate version.
-async fn health() -> Json<Value> {
+async fn health(State(state): State<AppState>) -> Json<Value> {
     let release = option_env!("MANAGER_VERSION")
         .map(|v| v.trim_start_matches('v'))
         .filter(|v| !v.is_empty() && *v != "dev");
@@ -754,7 +854,18 @@ async fn health() -> Json<Value> {
         "version": release.unwrap_or(env!("CARGO_PKG_VERSION")),
         "mode": if release.is_some() { "release" } else { "development" },
         "mostro_pinned_version": daemon::MOSTRO_VERSION,
+        "auth": state.auth.mode().as_str(),
+        "platform": platform(),
     }))
+}
+
+/// Where the panel runs, for the commands and paths it shows: `umbrel`, or
+/// `docker` for everything else. Set by the package with `MCM_PLATFORM`.
+fn platform() -> &'static str {
+    match std::env::var("MCM_PLATFORM").as_deref().map(str::trim) {
+        Ok("umbrel") => "umbrel",
+        _ => "docker",
+    }
 }
 
 async fn dashboard(State(state): State<AppState>) -> Json<Value> {

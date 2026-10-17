@@ -1,4 +1,5 @@
 pub mod adapters;
+pub mod auth;
 pub mod backup;
 pub mod card_publication;
 pub mod chat;

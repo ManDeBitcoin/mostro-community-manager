@@ -19,6 +19,9 @@ export const copyToClipboard = (text: string, onSuccess: () => void) => {
   }
 };
 
+/** Fired when the server answers that the panel needs a login (see useAuth). */
+export const LOGIN_REQUIRED_EVENT = 'mcm:login-required';
+
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -29,6 +32,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     }
   });
   const data = await response.json().catch(() => ({}));
+  if (response.status === 401 && data?.login_required) window.dispatchEvent(new Event(LOGIN_REQUIRED_EVENT));
   if (!response.ok) throw new Error(data?.error || `Error del servidor (${response.status})`);
   return data as T;
 }
