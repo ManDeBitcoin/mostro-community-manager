@@ -21,8 +21,9 @@ use std::{
 };
 use url::Url;
 
-const CERT_PATH: &str = "/lnd/tls.cert";
-const MACAROON_PATH: &str = "/lnd/mostro.macaroon";
+/// Where the daemon reads LND's TLS certificate and macaroon.
+pub const CERT_PATH: &str = "/lnd/tls.cert";
+pub const MACAROON_PATH: &str = "/lnd/mostro.macaroon";
 const MAX_DOCUMENT_BYTES: u64 = 1024 * 1024;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
