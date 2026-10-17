@@ -100,8 +100,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 mostro_community_api::config::render_settings(
                     &config,
                     origin,
-                    mostro_community_api::daemon::CERT_PATH,
-                    mostro_community_api::daemon::MACAROON_PATH,
+                    &mostro_community_api::daemon::cert_path(),
+                    &mostro_community_api::daemon::macaroon_path(),
                 )?
             );
             return Ok(());
@@ -157,17 +157,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let root = PathBuf::from(
                 std::env::var("CONFIG_DIR").unwrap_or_else(|_| "./var/config".into()),
             );
-            let default_origin = format!(
-                "https://{}:{}",
-                std::env::var("APP_LIGHTNING_NODE_IP").unwrap_or_else(|_| "10.21.21.9".into()),
-                std::env::var("APP_LIGHTNING_NODE_GRPC_PORT").unwrap_or_else(|_| "10009".into())
-            );
-            let origin = if args.len() >= 2 {
-                &args[1]
-            } else {
-                &default_origin
+            let origin = match args.get(1) {
+                Some(origin) => origin.clone(),
+                None => mostro_community_api::daemon::lnd_grpc_origin_from_env().ok_or(
+                    "Falta la dirección gRPC de LND: pásala como argumento o define MOSTRO_LND_GRPC_HOST (por ejemplo https://lnd:10009)",
+                )?,
             };
-            let activated = mostro_community_api::daemon::activate(&root, origin)?;
+            let activated = mostro_community_api::daemon::activate(&root, &origin)?;
             println!("{}", serde_json::to_string_pretty(&activated)?);
             return Ok(());
         }
@@ -417,11 +413,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         router(state)
     };
-    axum::serve(listener, app)
-        .with_graceful_shutdown(async {
-            let _ = tokio::signal::ctrl_c().await;
-        })
-        .await?;
+    // The connecting address is what the rate limiter counts.
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .with_graceful_shutdown(async {
+        let _ = tokio::signal::ctrl_c().await;
+    })
+    .await?;
     Ok(())
 }
 

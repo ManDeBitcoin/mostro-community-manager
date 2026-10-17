@@ -12,7 +12,7 @@ use crate::{
 };
 use axum::{
     Json, Router,
-    extract::{DefaultBodyLimit, State},
+    extract::{ConnectInfo, DefaultBodyLimit, State},
     http::{HeaderMap, StatusCode, header},
     middleware::{self, Next},
     response::{
@@ -27,8 +27,9 @@ use serde_json::{Value, json};
 use std::{
     collections::HashMap,
     convert::Infallible,
+    net::{IpAddr, SocketAddr},
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, OnceLock},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
@@ -207,18 +208,86 @@ async fn timeout_middleware(request: axum::extract::Request, next: Next) -> Resp
     }
 }
 
+/// Reverse proxies whose `X-Forwarded-For` can be believed: `TRUSTED_PROXIES`,
+/// a comma-separated list of addresses or CIDR ranges. Empty by default.
+fn trusted_proxies() -> &'static [(IpAddr, u8)] {
+    static TRUSTED: OnceLock<Vec<(IpAddr, u8)>> = OnceLock::new();
+    TRUSTED.get_or_init(|| parse_proxies(&std::env::var("TRUSTED_PROXIES").unwrap_or_default()))
+}
+
+/// Addresses and CIDR ranges of a `TRUSTED_PROXIES` list; invalid entries are skipped.
+pub fn parse_proxies(list: &str) -> Vec<(IpAddr, u8)> {
+    list.split(',')
+        .filter_map(|entry| {
+            let entry = entry.trim();
+            let (address, prefix) = match entry.split_once('/') {
+                Some((address, prefix)) => (address, Some(prefix)),
+                None => (entry, None),
+            };
+            let address: IpAddr = address.parse().ok()?;
+            let max = if address.is_ipv4() { 32 } else { 128 };
+            let prefix = match prefix {
+                Some(prefix) => prefix.parse::<u8>().ok().filter(|p| *p <= max)?,
+                None => max,
+            };
+            Some((address, prefix))
+        })
+        .collect()
+}
+
+fn in_range(ip: IpAddr, (network, prefix): (IpAddr, u8)) -> bool {
+    match (ip, network) {
+        (IpAddr::V4(ip), IpAddr::V4(network)) => {
+            let mask = u32::MAX.checked_shl(32 - u32::from(prefix)).unwrap_or(0);
+            u32::from(ip) & mask == u32::from(network) & mask
+        }
+        (IpAddr::V6(ip), IpAddr::V6(network)) => {
+            let mask = u128::MAX.checked_shl(128 - u32::from(prefix)).unwrap_or(0);
+            u128::from(ip) & mask == u128::from(network) & mask
+        }
+        _ => false,
+    }
+}
+
+/// Who a request counts against: the address that connected, unless it is a
+/// trusted proxy; then the nearest `X-Forwarded-For` address that is not one.
+/// A client cannot pick its own bucket by sending that header.
+pub fn client_key(peer: Option<IpAddr>, headers: &HeaderMap, trusted: &[(IpAddr, u8)]) -> String {
+    let Some(peer) = peer else {
+        return "local".into();
+    };
+    let is_trusted = |ip: IpAddr| trusted.iter().any(|network| in_range(ip, *network));
+    if !is_trusted(peer) {
+        return peer.to_string();
+    }
+    let forwarded: Vec<IpAddr> = headers
+        .get_all("x-forwarded-for")
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(|value| value.split(','))
+        .filter_map(|address| address.trim().parse().ok())
+        .collect();
+    forwarded
+        .into_iter()
+        .rev()
+        .find(|ip| !is_trusted(*ip))
+        .unwrap_or(peer)
+        .to_string()
+}
+
 async fn rate_limit_middleware(
     State(state): State<AppState>,
     headers: HeaderMap,
     request: axum::extract::Request,
     next: Next,
 ) -> Result<Response, Response> {
-    let client_key = headers
-        .get("x-forwarded-for")
-        .and_then(|h| h.to_str().ok())
-        .unwrap_or("127.0.0.1");
+    let peer = request
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|info| info.0.ip());
+    let client_key = client_key(peer, &headers, trusted_proxies());
 
-    if !state.rate_limiter.check(client_key, 1.0) {
+    if !state.rate_limiter.check(&client_key, 1.0) {
         let mut response = (
             StatusCode::TOO_MANY_REQUESTS,
             Json(json!({"error": "Demasiadas solicitudes. Límite de tasa excedido."})),
@@ -545,14 +614,15 @@ async fn daemon_activate_handler(
         })?)
     };
 
-    let default_origin = format!(
-        "https://{}:{}",
-        std::env::var("APP_LIGHTNING_NODE_IP").unwrap_or_else(|_| "10.21.21.9".into()),
-        std::env::var("APP_LIGHTNING_NODE_GRPC_PORT").unwrap_or_else(|_| "10009".into())
-    );
     let lnd_origin = payload
         .and_then(|p| p.lnd_grpc_origin)
-        .unwrap_or(default_origin);
+        .or_else(daemon::lnd_grpc_origin_from_env)
+        .ok_or_else(|| {
+            error(
+                StatusCode::BAD_REQUEST,
+                "Falta la dirección gRPC de LND: define MOSTRO_LND_GRPC_HOST (por ejemplo https://lnd:10009) en el contenedor del panel",
+            )
+        })?;
 
     daemon::activate(&root, &lnd_origin)
         .map(Json)

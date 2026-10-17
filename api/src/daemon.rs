@@ -21,9 +21,57 @@ use std::{
 };
 use url::Url;
 
-/// Where the daemon reads LND's TLS certificate and macaroon.
-pub const CERT_PATH: &str = "/lnd/tls.cert";
-pub const MACAROON_PATH: &str = "/lnd/mostro.macaroon";
+/// Where the daemon reads LND's TLS certificate and macaroon, unless
+/// `MOSTRO_LND_CERT_FILE` and `MOSTRO_LND_MACAROON_FILE` say otherwise.
+const DEFAULT_CERT_PATH: &str = "/lnd/tls.cert";
+const DEFAULT_MACAROON_PATH: &str = "/lnd/mostro.macaroon";
+
+fn env_or(name: &str, default: &str) -> String {
+    std::env::var(name)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| default.to_string())
+}
+
+/// LND's TLS certificate as the daemon's container sees it.
+pub fn cert_path() -> String {
+    env_or("MOSTRO_LND_CERT_FILE", DEFAULT_CERT_PATH)
+}
+
+/// The macaroon the daemon uses with LND, as its container sees it.
+pub fn macaroon_path() -> String {
+    env_or("MOSTRO_LND_MACAROON_FILE", DEFAULT_MACAROON_PATH)
+}
+
+/// The gRPC origin of LND for the daemon: `MOSTRO_LND_GRPC_HOST` (for
+/// example `https://lnd:10009`), or else the address Umbrel's Lightning app
+/// exports (`APP_LIGHTNING_NODE_IP`, `APP_LIGHTNING_NODE_GRPC_PORT`).
+/// `None` when neither is configured: no address is guessed.
+pub fn lnd_grpc_origin_from_env() -> Option<String> {
+    let var = |name| std::env::var(name).ok();
+    lnd_grpc_origin(
+        var("MOSTRO_LND_GRPC_HOST").as_deref(),
+        var("APP_LIGHTNING_NODE_IP").as_deref(),
+        var("APP_LIGHTNING_NODE_GRPC_PORT").as_deref(),
+    )
+}
+
+fn lnd_grpc_origin(host: Option<&str>, ip: Option<&str>, port: Option<&str>) -> Option<String> {
+    if let Some(host) = non_empty(host) {
+        return Some(host.trim_end_matches('/').to_string());
+    }
+    let ip = non_empty(ip)?;
+    Some(format!(
+        "https://{ip}:{}",
+        non_empty(port).unwrap_or("10009")
+    ))
+}
+
+fn non_empty(value: Option<&str>) -> Option<&str> {
+    value.map(str::trim).filter(|v| !v.is_empty())
+}
+
 const MAX_DOCUMENT_BYTES: u64 = 1024 * 1024;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -663,19 +711,23 @@ pub fn sync_active_settings(
     apply_settings(root, lnd_grpc_origin, false)
 }
 
-/// Brings an active daemon's settings in line with the saved rules, using the
-/// LND origin recorded at activation. `Ok(None)` when no daemon was activated.
-/// Without that record nothing is applied: a guessed origin could point the
-/// daemon at another node.
+/// Brings an active daemon's settings in line with the saved rules. The LND
+/// origin is the configured one (`lnd_grpc_origin_from_env`), else the one
+/// recorded at activation. `Ok(None)` when no daemon was activated. With
+/// neither, nothing is applied: a guessed origin could point the daemon at
+/// another node.
 pub fn sync_with_recorded_origin(root: &Path) -> Result<Option<ActivationResult>, &'static str> {
     let active_dir = root.join("active");
     if !active_dir.join("settings.toml").is_file() {
         return Ok(None);
     }
-    let origin = fs::read(active_dir.join("status.json"))
-        .ok()
-        .and_then(|bytes| serde_json::from_slice::<ActiveStatus>(&bytes).ok())
-        .map(|status| status.lnd_grpc_origin)
+    let origin = lnd_grpc_origin_from_env()
+        .or_else(|| {
+            fs::read(active_dir.join("status.json"))
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<ActiveStatus>(&bytes).ok())
+                .map(|status| status.lnd_grpc_origin)
+        })
         .ok_or("falta el registro de la activación (status.json)")?;
     sync_active_settings(root, &origin).map(Some)
 }
@@ -707,7 +759,7 @@ fn apply_settings(
     .map_err(|_| "Borrador inválido")?;
     let config = document.config.as_ref().ok_or("Borrador vacío")?;
 
-    let settings = render_settings(config, lnd_grpc_origin, CERT_PATH, MACAROON_PATH)
+    let settings = render_settings(config, lnd_grpc_origin, &cert_path(), &macaroon_path())
         .map_err(|_| "No se pudo generar settings.toml")?;
 
     let active_dir = root.join("active");
@@ -878,5 +930,26 @@ mod tests {
         ] {
             assert!(!uses_settings_directory(cmdline, dir));
         }
+    }
+
+    #[test]
+    fn the_lnd_origin_is_configured_never_guessed() {
+        // MOSTRO_LND_GRPC_HOST wins, without a trailing slash.
+        assert_eq!(
+            lnd_grpc_origin(Some(" https://lnd:10009/ "), Some("10.21.21.9"), None).as_deref(),
+            Some("https://lnd:10009")
+        );
+        // Umbrel's exports, with its default gRPC port when none is given.
+        assert_eq!(
+            lnd_grpc_origin(None, Some("10.21.21.9"), Some("10009")).as_deref(),
+            Some("https://10.21.21.9:10009")
+        );
+        assert_eq!(
+            lnd_grpc_origin(Some(""), Some("lnd"), None).as_deref(),
+            Some("https://lnd:10009")
+        );
+        // Nothing configured: no address at all, not Umbrel's.
+        assert_eq!(lnd_grpc_origin(None, None, Some("10009")), None);
+        assert_eq!(lnd_grpc_origin(Some("  "), Some(" "), None), None);
     }
 }
