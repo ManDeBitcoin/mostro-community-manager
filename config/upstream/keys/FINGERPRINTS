@@ -1,0 +1,7 @@
+# Primary keys of the mostrod maintainers who sign release manifests
+# (keys/*.asc of MostroP2P/mostro at v0.20.0, matching the fingerprints the
+# release notes print). scripts/verify-mostrod-release.sh trusts these and
+# nothing a release brings. Format: fingerprint name
+1E41631D137BA2ADE55344F73852B843679AD6F0 negrunch
+2E986CA1C5E7EA1635CD059C4989CC7415A43AEC arkanoider
+9A718444050F091D3D24CF6CE15E232F243D73E6 catrya

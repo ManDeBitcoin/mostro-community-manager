@@ -19,4 +19,15 @@ Requisitos de configuración:
 
 No crear ni subir manualmente un commit que cambie la versión del manifiesto antes de que GHCR tenga la imagen. No mover un tag existente para apuntarlo a otro commit; ante un fallo transitorio se puede reintentar el workflow del mismo tag. Para comprobar una versión desde fuera de GitHub, ejecutar en la tienda `python3 scripts/verify-public-image.py --repository mandebitcoin/mostro-community-manager X.Y.Z`.
 
+## Versión nueva de mostrod
+
+`.github/workflows/mostrod-upstream.yml` corre los martes (y a mano desde Actions, con una versión opcional). Si MostroP2P publicó una release más nueva que la fijada:
+
+1. `scripts/verify-mostrod-release.sh` exige al menos una firma válida de `manifest.txt` hecha por una clave de `config/upstream/keys/` (huellas en `FINGERPRINTS`, nunca claves que traiga la release) y que los SHA-256 de los binarios musl coincidan con el manifiesto. Si falla, no abre nada.
+2. Guarda en `scripts/fixtures/mostro-db/` la base que deja la versión fijada hasta ahora (`make-db-fixture.sh`), para probar que la nueva la migra.
+3. Fija la versión con `scripts/bump-mostrod.py` (pines, plantilla y proto), construye la imagen (pruebas Rust y contrato con la plantilla) y corre `container-smoke.sh` y `daemon-contract-smoke.sh`.
+4. Abre o actualiza el PR `mostrod/vX.Y.Z` con un resumen de `scripts/mostrod_release_summary.py`: claves de la plantilla nuevas, retiradas o con otro valor por defecto (marcando las que escribe el Manager), migraciones nuevas, RPC nuevas o retiradas y versión de mostro-core. Si las pruebas fallan, lo abre como borrador. Después lanza `image-check.yml` sobre la rama para probar también arm64.
+
+Lo que sigue siendo de una persona: leer las notas de la release, escribir las del Manager, fusionar y publicar el tag. El workflow necesita *Settings → Actions → General → Allow GitHub Actions to create and approve pull requests*.
+
 Umbrel sincroniza la tienda y ofrece la actualización, pero no la aplica automáticamente a las instalaciones. El operador debe elegir **Actualizar** en la interfaz de Umbrel cuando la publicación haya terminado.
