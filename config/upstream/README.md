@@ -24,6 +24,10 @@ Al arrancar, la API vuelve a aplicar las reglas guardadas (`daemon::sync_with_re
 
 El Manager es GPL-3.0-or-later (archivo `LICENSE` en la raíz del repositorio), igual que mostrod, así que compila la plantilla GPL de la versión fijada sin condicionar su licencia.
 
+## Claves de los firmantes
+
+`keys/` guarda las claves públicas de los mantenedores que firman los manifiestos de las releases (copiadas de `keys/` de MostroP2P/mostro en v0.20.0), y `keys/FINGERPRINTS` sus huellas principales. `scripts/verify-mostrod-release.sh` solo confía en esas huellas. Si upstream agrega o retira un firmante, se cambia aquí a mano, comprobando la huella con las notas de la release.
+
 ## El binario `mostrod`
 
 La imagen Docker descarga el binario oficial sin modificar desde la release de GitHub y comprueba su SHA-256 (ver `config/versions.json` y `docker/Dockerfile`). Desde v0.19.2 ese binario es GPL-3.0-or-later. La imagen incluye el texto de la licencia y este aviso en `/usr/share/licenses/mostrod/`. El código fuente correspondiente es el tag de la versión fijada:

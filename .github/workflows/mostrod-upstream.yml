@@ -1,0 +1,112 @@
+name: New mostrod release
+# Once a week (or on demand, for a given version) checks whether MostroP2P
+# published a mostrod release newer than the one pinned here. If so it
+# verifies it (a known maintainer's signature on the manifest, the binaries'
+# checksums), pins it with scripts/bump-mostrod.py, adds the database of the
+# release pinned until now to the migration fixtures, builds and tests the
+# image, and opens (or refreshes) a pull request whose body says what changes
+# (scripts/mostrod_release_summary.py). A release that fails verification
+# opens nothing; failing tests open the pull request as a draft.
+#
+# Merging, writing the release notes and tagging stay with a person.
+on:
+  schedule:
+    - cron: '0 13 * * 2' # Tuesdays, 13:00 UTC
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'mostrod version, e.g. 0.20.1 (empty: the latest release)'
+        required: false
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+concurrency:
+  group: mostrod-upstream
+  cancel-in-progress: false
+jobs:
+  bump:
+    if: github.repository == 'ManDeBitcoin/mostro-community-manager'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      # The branch this ran on: main on schedule, any branch on demand.
+      BASE: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Find the release
+        id: release
+        env:
+          REQUESTED: ${{ inputs.version }}
+        run: |
+          version="${REQUESTED:-$(gh api repos/MostroP2P/mostro/releases/latest --jq .tag_name)}"
+          version="${version#v}"
+          current="$(python3 -c 'import json; print(json.load(open("config/versions.json"))["mostro"]["version"])')"
+          current_amd64="$(python3 -c 'import json; print(json.load(open("config/versions.json"))["mostro"]["linux_amd64_sha256"])')"
+          {
+            echo "version=$version"
+            echo "current=$current"
+            echo "current_amd64=$current_amd64"
+            if [ "$version" = "$current" ]; then echo "new=false"; else echo "new=true"; fi
+          } >> "$GITHUB_OUTPUT"
+          echo "pinned: $current, release: $version"
+      - name: Verify signatures and checksums
+        id: verify
+        if: steps.release.outputs.new == 'true'
+        run: scripts/verify-mostrod-release.sh "${{ steps.release.outputs.version }}" "$RUNNER_TEMP/release" >> "$GITHUB_OUTPUT"
+      - name: Keep the database the pinned release leaves, for the migration check
+        if: steps.release.outputs.new == 'true'
+        run: |
+          fixture="scripts/fixtures/mostro-db/mostro-${{ steps.release.outputs.current }}.db"
+          [ -e "$fixture" ] || scripts/make-db-fixture.sh "${{ steps.release.outputs.current }}" "${{ steps.release.outputs.current_amd64 }}"
+      - name: Pin the release
+        if: steps.release.outputs.new == 'true'
+        run: |
+          tag="v${{ steps.release.outputs.version }}"
+          curl -fsSL "https://raw.githubusercontent.com/MostroP2P/mostro/$tag/settings.tpl.toml" -o "$RUNNER_TEMP/settings.tpl.toml"
+          curl -fsSL "https://raw.githubusercontent.com/MostroP2P/mostro/$tag/proto/admin.proto" -o "$RUNNER_TEMP/admin.proto"
+          python3 scripts/bump-mostrod.py "${{ steps.release.outputs.version }}" --verified \
+            --amd64 "${{ steps.verify.outputs.amd64_sha256 }}" --arm64 "${{ steps.verify.outputs.arm64_sha256 }}" \
+            --template "$RUNNER_TEMP/settings.tpl.toml" --proto "$RUNNER_TEMP/admin.proto"
+      - name: Build the image (Rust tests, template contract, clippy, panel)
+        id: build
+        if: steps.release.outputs.new == 'true'
+        continue-on-error: true
+        run: docker build -f docker/Dockerfile --build-arg MANAGER_VERSION=v0.0.0-mostrod -t mcm:mostrod .
+      - name: Run the new mostrod against rendered settings and old databases
+        id: smoke
+        if: steps.release.outputs.new == 'true' && steps.build.outcome == 'success'
+        continue-on-error: true
+        run: |
+          ./scripts/container-smoke.sh mcm:mostrod
+          ./scripts/daemon-contract-smoke.sh mcm:mostrod
+      - name: Open or refresh the pull request
+        if: steps.release.outputs.new == 'true'
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          CURRENT: ${{ steps.release.outputs.current }}
+          BUILD: ${{ steps.build.outcome }}
+          SMOKE: ${{ steps.smoke.outcome }}
+        run: |
+          python3 scripts/mostrod_release_summary.py "$CURRENT" "$VERSION" \
+            --signers "${{ steps.verify.outputs.signers }}" --build "$BUILD" --smoke "${SMOKE:-skipped}" > "$RUNNER_TEMP/body.md"
+          branch="mostrod/v$VERSION"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$branch"
+          git add config docker api/src/daemon.rs scripts
+          git commit -m "feat: mostrod v$VERSION" -m "Pinned by .github/workflows/mostrod-upstream.yml after verifying the release."
+          git push --force origin "HEAD:refs/heads/$branch"
+          draft=()
+          if [ "$BUILD" != success ] || [ "$SMOKE" != success ]; then draft=(--draft); fi
+          # --repo: never the community's repository.
+          if [ "$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --state open --json number --jq length)" = 0 ]; then
+            gh pr create --repo "$GITHUB_REPOSITORY" --base "$BASE" --head "$branch" \
+              --title "feat: mostrod v$VERSION" --body-file "$RUNNER_TEMP/body.md" "${draft[@]}"
+          else
+            gh pr edit "$branch" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/body.md"
+          fi
+          # A pull request opened with GITHUB_TOKEN triggers no workflow, but a
+          # dispatch does: run the amd64 and arm64 image check on the branch.
+          gh workflow run image-check.yml --repo "$GITHUB_REPOSITORY" --ref "$branch"
