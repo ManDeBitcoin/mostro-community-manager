@@ -1370,3 +1370,46 @@ async fn disputes_endpoint_requires_protection() {
         serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap();
     assert_eq!(body, serde_json::json!([]));
 }
+
+#[test]
+fn the_rate_limit_counts_the_connecting_address_not_a_header() {
+    use axum::http::{HeaderMap, HeaderValue};
+    use mostro_community_api::{client_key, parse_proxies};
+    use std::net::IpAddr;
+
+    let forged = |value: &str| {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_str(value).unwrap());
+        headers
+    };
+    let client: IpAddr = "203.0.113.7".parse().unwrap();
+    let proxy: IpAddr = "172.18.0.5".parse().unwrap();
+    let trusted = parse_proxies("172.16.0.0/12, ::1, nonsense, 10.0.0.0/99");
+    assert_eq!(trusted.len(), 2, "invalid entries are skipped");
+
+    // No proxy in front: a forged header does not move the client to another bucket.
+    assert_eq!(
+        client_key(Some(client), &forged("1.2.3.4"), &trusted),
+        "203.0.113.7"
+    );
+    assert_eq!(
+        client_key(Some(client), &forged("1.2.3.4"), &[]),
+        "203.0.113.7"
+    );
+    // Behind a trusted proxy: the nearest address that is not a proxy.
+    assert_eq!(
+        client_key(
+            Some(proxy),
+            &forged("1.2.3.4, 198.51.100.9, 172.18.0.2"),
+            &trusted
+        ),
+        "198.51.100.9"
+    );
+    // A trusted proxy without the header counts as itself.
+    assert_eq!(
+        client_key(Some(proxy), &HeaderMap::new(), &trusted),
+        "172.18.0.5"
+    );
+    // Requests without a connection address (tests, in-process calls).
+    assert_eq!(client_key(None, &forged("1.2.3.4"), &trusted), "local");
+}

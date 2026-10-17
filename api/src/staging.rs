@@ -9,8 +9,6 @@ use std::{
 };
 use url::Url;
 
-const CERT_PATH: &str = "/lnd/tls.cert";
-const MACAROON_PATH: &str = "/lnd/mostro.macaroon";
 const MAX_DOCUMENT_BYTES: u64 = 1024 * 1024;
 
 #[derive(Serialize)]
@@ -66,8 +64,13 @@ pub fn stage(root: &Path, lnd_grpc_origin: &str) -> Result<Staged, &'static str>
     )
     .map_err(|_| "Borrador inválido")?;
     let config = document.config.as_ref().ok_or("Borrador vacío")?;
-    let settings = render_settings(config, lnd_grpc_origin, CERT_PATH, MACAROON_PATH)
-        .map_err(|_| "No se pudo generar settings.toml")?;
+    let settings = render_settings(
+        config,
+        lnd_grpc_origin,
+        &crate::daemon::cert_path(),
+        &crate::daemon::macaroon_path(),
+    )
+    .map_err(|_| "No se pudo generar settings.toml")?;
 
     let staging = root.join("staging");
     ensure_private_dir(&staging)?;

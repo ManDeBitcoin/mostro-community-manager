@@ -17,4 +17,6 @@ pub mod staging;
 pub mod store;
 pub mod tunnel;
 
-pub use http::{AppState, Error, RateLimiter, error, router, verify_protection};
+pub use http::{
+    AppState, Error, RateLimiter, client_key, error, parse_proxies, router, verify_protection,
+};
