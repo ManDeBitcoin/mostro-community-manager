@@ -36,6 +36,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
             .map_err(|message| message.into());
         }
+        // A consistent copy of the daemon's database while it runs, for trying
+        // a new mostrod on it before an update (deploy/actualizar.sh).
+        if args.len() == 3 && args[0] == "snapshot-db" {
+            mostro_community_api::mostro_db::snapshot(
+                &PathBuf::from(&args[1]),
+                &PathBuf::from(&args[2]),
+            )?;
+            return Ok(());
+        }
         // The daemon's database: by default the active one under CONFIG_DIR.
         if (args.len() == 1 || args.len() == 2)
             && (args[0] == "open-orders" || args[0] == "db-check")
@@ -232,7 +241,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
         return Err(
-            "Uso: mostro-community-api [import-identity|derive-public-identity|export-backup|verify-backup <archivo>|restore-backup <archivo> <directorio-nuevo>|auto-backup [directorio]|stage-mostro-settings <origen-gRPC-LND>|render-settings <community.json|preset:ID> [origen-gRPC-LND]|restore-db <archivo> <destino>|open-orders [mostro.db]|db-check [mostro.db]|activate-daemon <origen-gRPC-LND>|deactivate-daemon|daemon-status|simulate-trade [happy-path|dispute-buyer|dispute-seller|cancel] [sats]|mock-relay <bind-addr>|connection-info|check-lnd|check-mostro|lnd-tunnel]".into(),
+            "Uso: mostro-community-api [import-identity|derive-public-identity|export-backup|verify-backup <archivo>|restore-backup <archivo> <directorio-nuevo>|auto-backup [directorio]|stage-mostro-settings <origen-gRPC-LND>|render-settings <community.json|preset:ID> [origen-gRPC-LND]|restore-db <archivo> <destino>|snapshot-db <mostro.db> <destino>|open-orders [mostro.db]|db-check [mostro.db]|activate-daemon <origen-gRPC-LND>|deactivate-daemon|daemon-status|simulate-trade [happy-path|dispute-buyer|dispute-seller|cancel] [sats]|mock-relay <bind-addr>|connection-info|check-lnd|check-mostro|lnd-tunnel]".into(),
         );
     }
 
@@ -359,6 +368,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     let backup_passphrase = std::env::var("BACKUP_PASSPHRASE")
         .ok()
+        .filter(|passphrase| !passphrase.is_empty())
         .map(age::secrecy::SecretString::from);
     let backup_interval_secs = std::env::var("BACKUP_INTERVAL_SECS")
         .ok()

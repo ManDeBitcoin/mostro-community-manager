@@ -1,19 +1,27 @@
-# Guía de Despliegue y Manual de Operaciones: Mostro Community Manager for Umbrel
+# Manual de operación: Mostro Community Manager
 
-> **Versión:** 1.0.0 (Producción)  
-> **Compatibilidad:** Umbrel OS v0.5+ / UmbrelOS 1.x  
 > **Protocolo:** Mostro v0.20.0, protocolo 2 (mensajes kind 14 con cifrado NIP-44) / Lightning Network (LND)
+
+Cómo poner en marcha y operar una comunidad Mostro desde el panel. Vale para todas las plataformas; lo que cambia de una a otra es la instalación:
+
+| Plataforma | Guía |
+| --- | --- |
+| Umbrel | [Instalar en Umbrel](instalar-umbrel.md) |
+| Docker, junto a un LND que ya tienes | [Instalar con Docker](instalar-docker.md) |
+| Docker, nodo completo (Bitcoin Core y LND, y el Manager aparte) | [Instalar un nodo completo](instalar-nodo-completo.md) |
+
+Para cambiar de versión: [actualizar y volver atrás](actualizar.md).
 
 ---
 
 ## 1. Visión General del Sistema
 
-**Mostro Community Manager** permite a cualquier operador con un nodo Umbrel desplegar y administrar una comunidad P2P de intercambio soberano de Bitcoin sin necesidad de programar, bifurcar software ni mantener clientes móviles propios.
+**Mostro Community Manager** permite a cualquier operador con un nodo Lightning desplegar y administrar una comunidad P2P de intercambio de Bitcoin sin programar, bifurcar software ni mantener clientes móviles propios.
 
 - **Compradores y Vendedores:** Utilizan la **Mostro App oficial** (disponible para Android, iOS y Web) conectándose directamente a tu nodo mediante la identidad pública (`npub` / `nprofile`) y los relays Nostr que configures.
-- **Motor de Mercado:** Ejecuta el daemon oficial de **Mostro** (v0.20.0) orquestado de forma aislada.
-- **Canal Financiero:** Se conecta al nodo **LND** de tu Umbrel mediante permisos mínimos de solo lectura (`readonly.macaroon`) para la interfaz administrativa, y credenciales seguras para el daemon de pagos.
-- **Panel de Control:** Servido mediante una API en Rust de alto rendimiento y una interfaz web en React con soporte para monitor de órdenes, consola de mediación cifrada, gestión de liquidez Lightning, alertas en vivo y respaldos cifrados.
+- **Motor de Mercado:** Ejecuta el daemon oficial de **Mostro** (v0.20.0) en su propio contenedor.
+- **Canal Financiero:** Se conecta a tu nodo **LND** con permiso de solo lectura (`readonly.macaroon`) para el panel, y con el macaroon del daemon para los pagos.
+- **Panel de Control:** Una API en Rust y una interfaz web en React con monitor de órdenes, consola de mediación, liquidez Lightning, alertas en vivo y respaldos cifrados.
 
 ```text
 USUARIOS (Mostro App)
@@ -23,7 +31,7 @@ USUARIOS (Mostro App)
        │
        ▼
 ┌────────────────────────────────────────────────────────┐
-│ UMBREL DEL OPERADOR                                    │
+│ SERVIDOR DEL OPERADOR (Umbrel, VPS o equipo propio)    │
 │  ├── Mostro Community Manager (Web + API Axum)         │
 │  │    ├── Monitor de órdenes (Kind 38383)              │
 │  │    ├── Tarjeta de la comunidad en los relays (opc.) │
@@ -32,7 +40,7 @@ USUARIOS (Mostro App)
 │  │    ├── Transmisión de alertas en vivo (SSE)         │
 │  │    └── Respaldos cifrados (age)                     │
 │  │                                                     │
-│  ├── Daemon Mostro (v0.20.0) [Orquestación Atómica]    │
+│  ├── Daemon Mostro (v0.20.0)                           │
 │  │                                                     │
 │  ├── LND (Lightning Node)                              │
 │  └── Bitcoin Core Node                                 │
@@ -43,44 +51,14 @@ USUARIOS (Mostro App)
 
 ## 2. Requisitos Previos
 
-Antes de instalar y poner en marcha tu comunidad, asegúrate de que tu nodo Umbrel cumpla con las siguientes condiciones:
-
-1. **Hardware y Sistema Operativo:**
-   - Servidor Umbrel operativo (Raspberry Pi 4/5, mini PC x86_64, etc.) con al menos 4 GB de memoria RAM.
-   - Disco SSD con espacio disponible (mínimo 10 GB libres para datos de la app y backups).
-2. **Aplicaciones Base Instaladas en Umbrel:**
-   - **Bitcoin Node (Bitcoin Core):** Completamente sincronizado al 100% de la cadena de bloques.
-   - **Lightning Node (LND):** Sincronizado a la cadena y con grafo Lightning actualizado.
-3. **Conectividad:**
-   - Conexión a internet estable 24/7.
-   - Puertos salientes habilitados para conectarse a relays Nostr (`wss://`) y peers Lightning.
+1. **Bitcoin Core** sincronizado al 100 % y **LND** sincronizado a la cadena, con su grafo Lightning actualizado. Los requisitos de hardware de cada plataforma están en su guía de instalación.
+2. **Conectividad:** internet estable 24/7, con salida hacia los relays Nostr (`wss://`) y los peers Lightning.
 
 ---
 
-## 3. Instalación en Umbrel
+## 3. Configuración Inicial (Paso a Paso)
 
-### Opción A: A través de la Umbrel App Store (Recomendada)
-1. Abre el panel de tu Umbrel (`http://umbrel.local`).
-2. Dirígete a la **App Store** de Umbrel.
-3. Si el repositorio comunitario de Mostro ya está indexado, busca **"Mostro Community Manager"** y haz clic en **Instalar**.
-4. Si estás usando una tienda comunitaria personalizada:
-   - Ve a los ajustes de la App Store de Umbrel.
-   - Añade el repositorio: `https://github.com/ManDeBitcoin/mostro-community-umbrel`.
-   - Selecciona **Mostro Community Manager** y confirma la instalación.
-
-### Opción B: Despliegue Manual para Pruebas / Desarrollo
-En una terminal SSH en tu servidor Umbrel:
-```bash
-cd ~/umbrel/app-stores/
-git clone https://github.com/ManDeBitcoin/mostro-community-umbrel.git getumbrel__mostro-community
-# La aplicación aparecerá inmediatamente disponible en la tienda local de tu Umbrel
-```
-
----
-
-## 4. Guía de Configuración Inicial (Paso a Paso)
-
-Una vez completada la instalación, abre la aplicación **Mostro Community Manager** desde el escritorio de tu Umbrel.
+Una vez instalado, abre el panel: en Umbrel, desde su escritorio; con Docker, en la dirección que diga `PANEL_BIND` (por defecto, por un túnel SSH) y con la contraseña del panel.
 
 El panel se organiza en cinco grupos, en el menú de la izquierda:
 
@@ -135,7 +113,7 @@ Abre **Lightning**. La página muestra el estado de tu nodo LND, la liquidez y c
 > **Las dos direcciones de la liquidez.** En cada operación el vendedor paga un depósito a tu nodo: esos sats **entran**, y para recibirlos hace falta **liquidez entrante**. Cuando la operación termina, tu nodo paga al comprador: esos sats **salen**, y para enviarlos hace falta **liquidez saliente** y una ruta hasta su monedero. Con solo saldo de tu lado, los depósitos de los vendedores no llegan.
 
 1. **Mira lo que hay.** La página indica la capacidad total, la liquidez saliente y entrante, y cuántas operaciones del importe máximo caben a la vez según la liquidez entrante de los canales activos. Es una estimación: no tiene en cuenta cómo se reparte el saldo entre canales, ni las garantías, las comisiones o las reservas de cada canal.
-2. **Consigue liquidez entrante.** Es la que suele faltar en un nodo nuevo. Puedes comprar un canal entrante a un proveedor de liquidez o en un mercado como Amboss Magma, o pedir a otro nodo que abra un canal hacia el tuyo. El canal tiene que abrirse en el nodo LND de tu Umbrel, que es el que usa Mostro: una app con su propio nodo Lightning no sirve para esto. Como referencia, ten varias veces el importe de tu operación máxima: cada operación en curso ocupa su importe hasta que se cierra, y las garantías ocupan el suyo.
+2. **Consigue liquidez entrante.** Es la que suele faltar en un nodo nuevo. Puedes comprar un canal entrante a un proveedor de liquidez o en un mercado como Amboss Magma, o pedir a otro nodo que abra un canal hacia el tuyo. El canal tiene que abrirse en el nodo LND que usa Mostro: una app con su propio nodo Lightning no sirve para esto. Como referencia, ten varias veces el importe de tu operación máxima: cada operación en curso ocupa su importe hasta que se cierra, y las garantías ocupan el suyo.
 3. **Abre canales salientes** hacia dos o tres nodos grandes y estables, para que el pago al comprador encuentre ruta.
 4. Un canal nuevo tarda unas confirmaciones en quedar activo. Espera a que la página muestre canales activos y la cadena sincronizada.
 
@@ -197,7 +175,7 @@ Quien desarrolla una app tiene la referencia completa en [`INTEGRACION-APPS.md`]
 
 ---
 
-## 5. Operaciones y Mantenimiento Diario
+## 4. Operaciones y Mantenimiento Diario
 
 ### Resumen
 La página de inicio responde a tres preguntas:
@@ -237,18 +215,22 @@ Debajo, **Servicios** muestra de qué depende el mercado: el daemon Mostro, Ligh
 
 ### Respaldos
 1. **A mano.** En **Respaldos**, escribe la frase de cifrado y pulsa **Crear respaldo**. El archivo se descifra de inmediato con la misma frase para comprobarlo antes de darlo por bueno.
-2. **Automático.** Se activa cuando el servicio arranca con la frase en la variable de entorno `BACKUP_PASSPHRASE`, y repite la copia cada 24 horas. El paquete de Umbrel no define esa variable, así que en Umbrel los respaldos son manuales.
+2. **Automático.** Se activa cuando el servicio arranca con la frase en la variable de entorno `BACKUP_PASSPHRASE`, y repite la copia cada 24 horas. Con Docker se define en `.env`. El paquete de Umbrel no la define, así que en Umbrel los respaldos son manuales.
 3. **Cuántos se conservan.** Los 7 más recientes. Cada respaldo nuevo, manual o automático, borra de esa carpeta los que sobran: copia fuera los que quieras guardar más tiempo.
-4. Los archivos quedan en `/data/backup` dentro del contenedor. Para sacar uno del equipo:
+4. Los archivos quedan en `/data/backup` dentro del contenedor `web`. Para sacar uno del equipo, en Umbrel por SSH:
    ```bash
    sudo docker cp mandebitcoin-mostro-manager_web_1:/data/backup/<archivo.age> .
    ```
+   Con Docker, desde la carpeta de la instalación:
+   ```bash
+   docker compose cp web:/data/backup/<archivo.age> .
+   ```
    Una copia que solo vive en el mismo disco no protege frente a su pérdida.
 
-> **La base del daemon va en un archivo aparte.** Desde la v1.0.16, cada respaldo guarda también la base de datos del daemon (`/data/config/active/mostro.db`: órdenes, disputas, usuarios, garantías y reputación) en `mostro-db-rev<N>-<fecha>.age`, junto al archivo de identidad y reglas. Se copia de forma consistente aunque el daemon esté en marcha, se cifra con la misma frase y se comprueba antes de darlo por bueno. Se restaura con `restore-db <archivo> <destino>`, en un archivo nuevo; ponerlo en lugar de `active/mostro.db` es un paso manual, con el daemon parado. Además, antes de cada versión nueva de mostrod el contenedor `mostro` guarda una copia en `/data/config/db-snapshots/`. Antes de migrar o reinstalar, espera a que no queden operaciones en curso (`open-orders`). El saldo y los canales dependen del respaldo de LND, que gestiona la app Lightning de Umbrel.
+> **La base del daemon va en un archivo aparte.** Desde la v1.0.16, cada respaldo guarda también la base de datos del daemon (`/data/config/active/mostro.db`: órdenes, disputas, usuarios, garantías y reputación) en `mostro-db-rev<N>-<fecha>.age`, junto al archivo de identidad y reglas. Se copia de forma consistente aunque el daemon esté en marcha, se cifra con la misma frase y se comprueba antes de darlo por bueno. Se restaura con `restore-db <archivo> <destino>`, en un archivo nuevo; ponerlo en lugar de `active/mostro.db` es un paso manual, con el daemon parado. Además, antes de cada versión nueva de mostrod el contenedor `mostro` guarda una copia en `/data/config/db-snapshots/`. Antes de migrar o reinstalar, espera a que no queden operaciones en curso (`open-orders`). El saldo y los canales dependen del respaldo de LND (en Umbrel lo gestiona la app Lightning; en el nodo completo, ver [su guía](instalar-nodo-completo.md#respaldo-de-los-canales)).
 
 ### Restauración
-La restauración no se hace desde el panel. Se ejecuta por SSH, dentro del contenedor de la aplicación, y siempre sobre una carpeta nueva para no pisar una instalación en uso. Los dos comandos piden la frase en la terminal.
+La restauración no se hace desde el panel. Se ejecuta por SSH, dentro del contenedor `web`, y siempre sobre una carpeta nueva para no pisar una instalación en uso. Los dos comandos piden la frase en la terminal. Aquí van como en Umbrel; con Docker, cambia `sudo docker exec -it --user 1000:1000 mandebitcoin-mostro-manager_web_1` por `docker compose exec web`, desde la carpeta de la instalación. La página Respaldos muestra los de tu plataforma.
 
 1. Comprueba que el archivo se abre con tu frase:
    ```bash
@@ -262,11 +244,12 @@ La restauración no se hace desde el panel. Se ejecuta por SSH, dentro del conte
 
 ---
 
-## 6. Seguridad y Buenas Prácticas
+## 5. Seguridad y Buenas Prácticas
 
 - **Principio de Mínimo Privilegio:** El Community Manager opera con macaroon de solo lectura (`readonly.macaroon`) y nunca almacena claves privadas en texto claro en el navegador.
 - **Permisos de Archivos:** Todo el almacenamiento sensible bajo `/data/config` se mantiene estrictamente en permisos `0700` para carpetas y `0600` para archivos.
 - **Protección Anti-CSRF:** Todos los endpoints de mutación y lectura sensible exigen la cabecera `X-Requested-With: mostro-community` y validación estricta de origen.
-- **Seguridad en Contenedores:** Los servicios en Docker Compose operan con `read_only: true`, `cap_drop: [ALL]`, `tmpfs: [/tmp]` y red interna segregada `manager_private`.
+- **Acceso al panel:** Con Docker pide una contraseña (`PANEL_PASSWORD_FILE`), con sesiones de 7 días y 5 intentos por minuto; si escucha fuera de `127.0.0.1` sin ella, no arranca. En Umbrel el login lo da el `app_proxy` de Umbrel.
+- **Seguridad en Contenedores:** Los servicios en Docker Compose operan con `read_only: true`, `cap_drop: [ALL]`, `tmpfs: [/tmp]` y `no-new-privileges`. En Umbrel la API vive además en la red interna `manager_private`.
 - **Cero Gasto Accidental:** Todas las funciones de monitoreo y simulación son de solo lectura o dry-run en memoria.
 - **Lo único que el panel publica:** la tarjeta de la comunidad, y solo con su interruptor encendido (paso 7). Es el único evento que el panel firma con la clave del nodo. No es un mensaje del protocolo Mostro y no mueve fondos. El resto de lo que tu nodo anuncia lo publica el daemon.

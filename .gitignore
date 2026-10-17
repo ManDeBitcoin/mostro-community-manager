@@ -7,3 +7,11 @@ web/dist/
 
 __pycache__/
 *.pyc
+
+# Lo propio de cada instalación de deploy/: nunca va al repositorio.
+/deploy/*/.env
+/deploy/*/data/
+/deploy/*/lnd/
+/deploy/*/secrets/
+/deploy/*/respaldos/
+/deploy/*/docker-compose.override.yml

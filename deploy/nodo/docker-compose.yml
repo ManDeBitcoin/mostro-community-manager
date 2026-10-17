@@ -1,0 +1,77 @@
+# Nodo Bitcoin y Lightning: Bitcoin Core y LND, en su propio proyecto.
+# Guía: docs/instalar-nodo-completo.md
+#
+# El Manager no vive aquí: se instala aparte con deploy/compose y se une a la
+# red de LND (NODO_RED_LND). Así actualizar, reiniciar o apagar el Manager
+# nunca para LND ni Bitcoin Core, y sus contenedores no ven bitcoind.
+#
+# No edites este archivo: lo propio de tu instalación va en .env y, si hace
+# falta, en docker-compose.override.yml (no se versiona). Cambiar de versión de
+# LND o Bitcoin Core es decisión tuya, en esta carpeta (ver la guía).
+#
+# Carpetas, junto a este archivo (las crea ./preparar.sh):
+#   data/bitcoind/     cadena de bloques y bitcoin.conf
+#   data/lnd/          billetera, canales y lnd.conf (lleva la contraseña RPC)
+#   data/lnd-export/   lo que LND comparte: ro/tls.cert y ro/readonly.macaroon,
+#                      y admin.macaroon
+#   secrets/lnd/       wallet-password, la contraseña de la billetera de LND
+#
+# Coolify: pega este archivo como recurso "Docker Compose" cambiando cada ./
+# de los volúmenes por la ruta absoluta de la carpeta, y sin dominio en ningún
+# servicio. Ver la guía.
+name: ${COMPOSE_PROJECT_NAME:-nodo-bitcoin}
+
+services:
+  bitcoind:
+    image: ghcr.io/getumbrel/docker-bitcoind:v31.1@sha256:e0a94f8390f4fee796faba306719860a1ba61e8fa841416bca26fd4e1e94cb8c
+    user: "1000:1000"
+    restart: unless-stopped
+    stop_grace_period: 3m
+    volumes:
+      - ./data/bitcoind:/data/.bitcoin
+    # Solo en la red interna del nodo: lo único que lo alcanza es LND.
+    networks: [default]
+    mem_limit: ${BITCOIND_MEM_LIMIT:-1200m}
+    memswap_limit: ${BITCOIND_MEM_LIMIT:-1200m}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  lnd:
+    image: lightninglabs/lnd:v0.21.4-beta@sha256:04d06edcc0f6e99a5e797ea34959f330add222226f840cd86afbc31f8f29627d
+    user: "1000:1000"
+    restart: unless-stopped
+    stop_grace_period: 2m
+    depends_on:
+      bitcoind:
+        condition: service_started
+    environment:
+      HOME: /home/lnd
+    volumes:
+      - ./data/lnd:/home/lnd/.lnd
+      - ./data/lnd-export:/export
+      - ./secrets/lnd:/secrets:ro
+    # default: para hablar con bitcoind. lnd: la red a la que se unen sus
+    # clientes (el Manager, Alby Hub...), que solo ven a LND, como «lnd».
+    networks: [default, lnd]
+    # Puerto P2P de Lightning, para que otros nodos puedan abrirte canales.
+    ports:
+      - "${LND_P2P_BIND:-0.0.0.0}:${LND_P2P_PORT:-9735}:9735"
+    mem_limit: ${LND_MEM_LIMIT:-1536m}
+    memswap_limit: ${LND_MEM_LIMIT:-1536m}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+networks:
+  default: {}
+  lnd:
+    name: ${NODO_RED_LND:-nodo-lnd}

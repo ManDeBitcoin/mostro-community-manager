@@ -1,0 +1,113 @@
+# Mostro Community Manager junto a un nodo LND que ya tienes.
+# Guía: docs/instalar-docker.md. Actualizar: ../actualizar.sh X.Y.Z
+#
+# No edites este archivo: cada actualización lo cambia por el de la versión
+# nueva. Lo propio de tu instalación va en .env y, si hace falta, en
+# docker-compose.override.yml (no se versiona).
+#
+# Carpetas, junto a este archivo:
+#   data/      identidad, reglas, base de datos de mostrod y respaldos
+#   lnd/       credenciales de LND: ro/tls.cert, ro/readonly.macaroon (panel)
+#              y mostro.macaroon (daemon)
+#   secrets/   panel_password, la contraseña del panel
+name: ${COMPOSE_PROJECT_NAME:-mostro-manager}
+
+services:
+  # Deja los permisos de las carpetas como los esperan web y mostro (usuario
+  # 1000) y comprueba que estén las credenciales antes de arrancarlos.
+  init:
+    image: ${MCM_IMAGE:?falta MCM_IMAGE en .env}
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        for f in /lnd/ro/tls.cert /lnd/ro/readonly.macaroon /lnd/mostro.macaroon /secrets/panel_password; do
+          if [ ! -s "$$f" ]; then
+            echo "Falta $${f#/} en la carpeta de la instalacion (ver docs/instalar-docker.md)" >&2
+            exit 1
+          fi
+        done
+        mkdir -p /data/config /data/backup
+        chown -R 1000:1000 /data /lnd /secrets
+        chmod 700 /data/config /data/backup /lnd /lnd/ro /secrets
+        chmod 600 /lnd/mostro.macaroon /lnd/ro/tls.cert /lnd/ro/readonly.macaroon /secrets/panel_password
+    # The image's healthcheck probes the panel, which only the web service runs.
+    healthcheck:
+      disable: true
+    volumes:
+      - ./data:/data
+      - ./lnd:/lnd
+      - ./secrets:/secrets
+    network_mode: none
+    restart: "no"
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, FOWNER, DAC_OVERRIDE]
+    security_opt: ["no-new-privileges:true"]
+
+  # Panel y API. Escucha en 127.0.0.1 salvo que .env diga otra cosa, y pide
+  # la contraseña de secrets/panel_password.
+  web:
+    image: ${MCM_IMAGE:?falta MCM_IMAGE en .env}
+    user: "1000:1000"
+    restart: unless-stopped
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    ports:
+      - "${PANEL_BIND:-127.0.0.1}:${PANEL_PORT:-5173}:3001"
+    environment:
+      MCM_PLATFORM: docker
+      PANEL_PASSWORD_FILE: /run/secrets/panel_password
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      # Lo que el panel consulta de LND, con permiso de solo lectura.
+      LND_REST_URL: ${LND_REST_URL:?falta LND_REST_URL en .env}
+      LND_CONNECT_HOST: ${LND_CONNECT_HOST:-}
+      LND_TLS_CERT: /lnd/tls.cert
+      LND_READONLY_MACAROON: /lnd/readonly.macaroon
+      # Lo que el panel escribe en la configuración de mostrod: rutas como las
+      # ve el contenedor mostro.
+      MOSTRO_LND_GRPC_HOST: ${LND_GRPC_HOST:?falta LND_GRPC_HOST en .env}
+      MOSTRO_LND_CERT_FILE: /lnd/ro/tls.cert
+      MOSTRO_LND_MACAROON_FILE: /lnd/mostro.macaroon
+      BACKUP_OFFSITE_DIR: /data/backup
+      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:-}
+    volumes:
+      - ./data:/data
+      - ./lnd/ro:/lnd:ro
+      - ./secrets:/run/secrets:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  # El daemon mostrod. Espera sin hacer nada hasta que lo actives en el panel.
+  mostro:
+    image: ${MCM_IMAGE:?falta MCM_IMAGE en .env}
+    entrypoint: ["/bin/sh", "/usr/local/bin/mostro-entrypoint"]
+    # The image's healthcheck probes the panel, which only the web service runs.
+    healthcheck:
+      disable: true
+    user: "1000:1000"
+    restart: unless-stopped
+    stop_grace_period: 20s
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    environment:
+      STANDBY_IF_UNCONFIGURED: "true"
+      MOSTRO_SETTINGS_DIR: /data/config/active
+      MOSTRO_IDENTITY_FILE: /data/config/identity/mostro.nsec
+      TERM: xterm
+    volumes:
+      - ./data:/data
+      - ./lnd:/lnd:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]

@@ -1093,7 +1093,11 @@ async fn backup_trigger_handler(
 
     let passphrase_str = payload
         .and_then(|p| p.0.passphrase)
-        .or_else(|| std::env::var("BACKUP_PASSPHRASE").ok())
+        .or_else(|| {
+            std::env::var("BACKUP_PASSPHRASE")
+                .ok()
+                .filter(|passphrase| !passphrase.is_empty())
+        })
         .ok_or_else(|| {
             error(
                 StatusCode::BAD_REQUEST,
