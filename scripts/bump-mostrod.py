@@ -55,6 +55,7 @@ def bump(root: Path, version: str, amd64: str, arm64: str, template: Path, proto
     for dockerfile in ("docker/Dockerfile", "docker/Dockerfile.mostro"):
         replace(root, dockerfile, [
             (f"/releases/download/v{old}/", f"/releases/download/v{version}/"),
+            (f"ENV MOSTROD_VERSION={old}\n", f"ENV MOSTROD_VERSION={version}\n"),
             (old_amd64, amd64),
             (old_arm64, arm64),
         ])

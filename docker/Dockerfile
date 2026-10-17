@@ -44,6 +44,8 @@ COPY docker/mostro-entrypoint.sh /usr/local/bin/mostro-entrypoint
 RUN chmod 755 /usr/local/bin/mostro-entrypoint
 COPY --from=web /src/dist /opt/manager/web
 ENV API_BIND=0.0.0.0:3001 CONFIG_DIR=/data/config STATIC_DIR=/opt/manager/web TERM=xterm
+# The mostrod release above; the entrypoint copies the database before another one starts.
+ENV MOSTROD_VERSION=0.20.0
 USER 1000:1000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s CMD curl -fsS http://127.0.0.1:3001/api/health || exit 1
 ENTRYPOINT ["mostro-community-api"]

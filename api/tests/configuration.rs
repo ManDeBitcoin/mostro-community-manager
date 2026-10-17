@@ -466,6 +466,10 @@ fn every_pin_of_the_daemon_release_agrees() {
             );
             assert!(text.contains(amd64), "{dockerfile}: amd64 checksum");
             assert!(text.contains(arm64), "{dockerfile}: arm64 checksum");
+            assert!(
+                text.contains(&format!("ENV MOSTROD_VERSION={version}\n")),
+                "{dockerfile}: MOSTROD_VERSION"
+            );
         }
     }
     for script in [

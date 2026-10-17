@@ -63,6 +63,46 @@ case "$refusal" in
 esac
 printf '%s\n' 'nsec1synthetic-test-only' > "$temp_dir/mostro.nsec"
 
+# ── Database copy before another mostrod version first starts ───────────────
+snapshots="$temp_dir/db-snapshots"
+marker="$temp_dir/settings/mostro.version"
+start_version() {
+    MOSTROD_VERSION=$1 MOSTRO_DB_SNAPSHOT_KEEP=${2:-5} run_entrypoint
+}
+copies() { ls "$snapshots"/mostro-*.db 2>/dev/null | wc -l; }
+# A first start without a database records the version and copies nothing.
+start_version 1.0.0
+[ "$(cat "$marker")" = 1.0.0 ] || { echo 'version not recorded on a first start' >&2; exit 1; }
+[ ! -e "$snapshots" ] || { echo 'a copy was made with no database' >&2; exit 1; }
+# The same version again: nothing to copy.
+printf 'datos 1.0.0' > "$temp_dir/settings/mostro.db"
+start_version 1.0.0
+[ ! -e "$snapshots" ] || { echo 'a copy was made without a version change' >&2; exit 1; }
+# Another version: the database is copied as it was, in a private folder.
+start_version 1.1.0
+[ "$(copies)" -eq 1 ] || { echo 'no copy before the version change' >&2; exit 1; }
+[ "$(cat "$snapshots"/mostro-1.0.0-a-1.1.0-*.db)" = 'datos 1.0.0' ] || { echo 'the copy is not the database before the change' >&2; exit 1; }
+[ "$(stat -c %a "$snapshots")" = 700 ] || { echo 'the copies folder is not private' >&2; exit 1; }
+[ "$(cat "$marker")" = 1.1.0 ] || { echo 'new version not recorded' >&2; exit 1; }
+# An install from before this check (no marker) is copied too.
+rm "$marker"
+start_version 1.1.0
+ls "$snapshots"/mostro-desconocida-a-1.1.0-*.db >/dev/null 2>&1 || { echo 'no copy for an install without a recorded version' >&2; exit 1; }
+# Only the newest copies are kept.
+start_version 1.2.0 2
+start_version 1.3.0 2
+[ "$(copies)" -eq 2 ] || { echo "kept $(copies) copies instead of 2" >&2; exit 1; }
+# Without a place for the copy, mostrod does not start, and the version is not recorded.
+rm -rf "$snapshots"
+mkdir "$temp_dir/locked"
+chmod 500 "$temp_dir/locked"
+if MOSTROD_VERSION=2.0.0 MOSTRO_DB_SNAPSHOT_DIR="$temp_dir/locked/copias" run_entrypoint; then
+    echo 'mostrod started without a copy of the database' >&2; exit 1
+fi
+[ "$(cat "$marker")" = 1.3.0 ] || { echo 'version recorded although no copy was made' >&2; exit 1; }
+chmod 700 "$temp_dir/locked"
+rm -f "$marker" "$temp_dir/settings/mostro.db"
+
 # ── Standby mode: the supervisor loop used by the Umbrel package ─────────────
 fail() {
     printf '%s\n' "entrypoint smoke failed: $1" >&2
