@@ -9,7 +9,7 @@ import { type Tone, Badge, Callout, CopyField, EmptyState, LinkButton, PageHeade
 
 type QrFormat = 'card' | 'uri' | 'json';
 
-const GUIDE_URL = 'https://github.com/ManDeBitcoin/mostro-community-umbrel/blob/main/docs/INTEGRACION-APPS.md';
+const GUIDE_URL = 'https://github.com/ManDeBitcoin/mostro-community-manager/blob/main/docs/INTEGRACION-APPS.md';
 
 const FORMATS: { id: QrFormat; label: string; caption: string }[] = [
   { id: 'card', label: 'Tarjeta', caption: 'La tarjeta de la comunidad firmada por el nodo: nombre, relays, moneda y métodos de pago. Es la opción recomendada.' },

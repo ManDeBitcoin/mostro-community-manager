@@ -24,7 +24,7 @@ class DaemonPinTests(unittest.TestCase):
         self.assertNotEqual(*self.checksums)
 
     def test_dockerfiles_download_the_pinned_release(self):
-        for name in ("docker/Dockerfile.umbrel", "docker/Dockerfile.mostro"):
+        for name in ("docker/Dockerfile", "docker/Dockerfile.mostro"):
             text = (ROOT / name).read_text()
             self.assertIn(f"/releases/download/v{self.version}/", text, name)
             for checksum in self.checksums:
