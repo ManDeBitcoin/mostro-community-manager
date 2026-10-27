@@ -4,11 +4,11 @@ ARG TARGETARCH
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl ncurses-base && rm -rf /var/lib/apt/lists/*
 RUN set -eu; \
     case "$TARGETARCH" in \
-      amd64) artifact=mostrod-x86_64-unknown-linux-musl; checksum=078c2f1a2f0d9a3e438e5d363480c79a19931664ceb36be0661155f73171bc86 ;; \
-      arm64) artifact=mostrod-aarch64-unknown-linux-musl; checksum=f82fe9e7f09e727851a8fcbf107d4c266abdb1ee47f7092dba116f891ccce1f6 ;; \
+      amd64) artifact=mostrod-x86_64-unknown-linux-musl; checksum=6fbce24e9659bf10b54ecf22aab48f43852e36dfb547cd97777465e328583920 ;; \
+      arm64) artifact=mostrod-aarch64-unknown-linux-musl; checksum=e0f04e7e876375497ed7634c443957b04ab712a7dc214f11fe1677951f1c75a2 ;; \
       *) echo 'Unsupported architecture' >&2; exit 1 ;; \
     esac; \
-    curl -fsSL "https://github.com/MostroP2P/mostro/releases/download/v0.20.0/$artifact" -o /mostrod; \
+    curl -fsSL "https://github.com/MostroP2P/mostro/releases/download/v0.20.1/$artifact" -o /mostrod; \
     echo "$checksum  /mostrod" | sha256sum -c -; \
     chmod 755 /mostrod; \
     TERM=xterm /mostrod --version
@@ -24,6 +24,6 @@ USER 1000:1000
 WORKDIR /data
 ENV TERM=xterm
 # The mostrod release above; the entrypoint copies the database before another one starts.
-ENV MOSTROD_VERSION=0.20.0
+ENV MOSTROD_VERSION=0.20.1
 # Deliberately no default settings or identity: both must be mounted explicitly.
 ENTRYPOINT ["/bin/sh", "/usr/local/bin/mostro-entrypoint"]
