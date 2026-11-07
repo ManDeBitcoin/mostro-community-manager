@@ -66,7 +66,7 @@ pathlib.Path(os.environ['SMOKE_SECRETS'],'cookie').write_text(cookie)
 PY
 docker exec "$SMOKE_NAME" mostro-community-api check-mostro | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data["draft"]["status"] == "valid" and data["identity"]["status"] == "missing" and data["can_start_market"] is False'
 docker exec "$SMOKE_NAME" mostro-community-api daemon-status | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data["state"] == "unconfigured" and data["can_activate"] is False'
-docker exec "$SMOKE_NAME" mostrod --version | grep -F 'mostro p2p 0.20.0' >/dev/null
+docker exec "$SMOKE_NAME" mostrod --version | grep -F 'mostro p2p 0.20.1' >/dev/null
 docker restart "$SMOKE_NAME" >/dev/null
 # Docker may assign a different ephemeral host port when restarting the container.
 SMOKE_PORT="$(docker port "$SMOKE_NAME" 3001/tcp | cut -d: -f2)"

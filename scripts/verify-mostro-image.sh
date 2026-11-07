@@ -23,7 +23,7 @@ docker build --platform "$platform" --file docker/Dockerfile.mostro --tag "$imag
 # No network, ports, mounts or credentials are provided to either container.
 docker run --rm --network none --read-only --cap-drop ALL \
   --security-opt no-new-privileges "$image" --version > "$output" 2>&1
-if ! grep -Fq 'mostro p2p 0.20.0' "$output"; then
+if ! grep -Fq 'mostro p2p 0.20.1' "$output"; then
   printf '%s\n' 'La imagen no devolvió la versión esperada.' >&2
   cat "$output" >&2
   exit 1
@@ -40,4 +40,4 @@ if ! grep -Fq 'Mostro startup refused: private identity file is missing or is a 
   exit 1
 fi
 
-printf '%s\n' 'Verificación aprobada: imagen oficial v0.20.0 y arranque protegido.'
+printf '%s\n' 'Verificación aprobada: imagen oficial v0.20.1 y arranque protegido.'
