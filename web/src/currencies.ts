@@ -106,6 +106,11 @@ export const CURRENCY_CODES: CurrencyEntry[] = [
     "nameEs": "Dólar bahameño"
   },
   {
+    "code": "BTC",
+    "nameEn": "Bitcoin (on-chain)",
+    "nameEs": "Bitcoin (on-chain)"
+  },
+  {
     "code": "BTN",
     "nameEn": "Bhutanese Ngultrum",
     "nameEs": "Gultrum butanés"
@@ -204,6 +209,11 @@ export const CURRENCY_CODES: CurrencyEntry[] = [
     "code": "DKK",
     "nameEn": "Danish Krone",
     "nameEs": "Corona danesa"
+  },
+  {
+    "code": "DOC",
+    "nameEn": "Dollar on Chain (Rootstock)",
+    "nameEs": "Dollar on Chain (Rootstock)"
   },
   {
     "code": "DOP",
@@ -406,6 +416,11 @@ export const CURRENCY_CODES: CurrencyEntry[] = [
     "nameEs": "Libra libanesa"
   },
   {
+    "code": "LBTC",
+    "nameEn": "Liquid Bitcoin",
+    "nameEs": "Liquid Bitcoin (LBTC)"
+  },
+  {
     "code": "LKR",
     "nameEn": "Sri Lankan Rupee",
     "nameEs": "Rupia esrilanquesa"
@@ -576,6 +591,11 @@ export const CURRENCY_CODES: CurrencyEntry[] = [
     "nameEs": "Rial catarí"
   },
   {
+    "code": "RBTC",
+    "nameEn": "Rootstock Bitcoin",
+    "nameEs": "Rootstock Bitcoin (RBTC)"
+  },
+  {
     "code": "RON",
     "nameEn": "Romanian Leu",
     "nameEs": "Leu rumano"
@@ -719,6 +739,16 @@ export const CURRENCY_CODES: CurrencyEntry[] = [
     "code": "USD",
     "nameEn": "US Dollar",
     "nameEs": "Dólar estadounidense"
+  },
+  {
+    "code": "USDC",
+    "nameEn": "USD Coin",
+    "nameEs": "USD Coin (stablecoin)"
+  },
+  {
+    "code": "USDT",
+    "nameEn": "Tether USD",
+    "nameEs": "Tether USD (stablecoin)"
   },
   {
     "code": "USN",

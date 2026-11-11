@@ -112,10 +112,15 @@ impl Configuration {
         if m.fiat_currencies.is_empty()
             || m.fiat_currencies.len() > 30
             || m.fiat_currencies.iter().any(|v| {
-                v.len() != 3 || !v.bytes().all(|b| b.is_ascii_uppercase()) || !currencies.insert(v)
+                v.len() < 3
+                    || v.len() > 5
+                    || !v.bytes().all(|b| b.is_ascii_uppercase())
+                    || !currencies.insert(v)
             })
         {
-            return Err("Selecciona códigos de moneda de tres letras, únicos y en mayúsculas");
+            return Err(
+                "Selecciona códigos de moneda válidos (de 3 a 5 letras), únicos y en mayúsculas",
+            );
         }
         let s = &self.safety;
         if s.bond_bps > 10_000 || s.base_bond_sats > 100_000_000 {
@@ -326,6 +331,7 @@ pub fn render_settings(
         payout_max_retries = 5
         payout_claim_window_days = 15
         maker_bond_payment_timeout_seconds = 900
+        bond_cltv_delta = 432
     };
     doc.as_table_mut()
         .unwrap()
