@@ -21,6 +21,15 @@ fn rejects_unsafe_and_ambiguous_settings() {
     c.market.fiat_currencies.push("EUR".into());
     assert!(c.validate().is_err());
     c = config();
+    c.market.fiat_currencies = vec!["USDT".into()];
+    assert!(c.validate().is_ok());
+    c = config();
+    c.market.fiat_currencies = vec!["TOOLONG".into()];
+    assert!(c.validate().is_err());
+    c = config();
+    c.market.fiat_currencies = vec!["NO".into()];
+    assert!(c.validate().is_err());
+    c = config();
     c.nostr.relays = vec!["wss://user:secret@example.com".into()];
     assert!(c.validate().is_err());
     c = config();
@@ -65,6 +74,10 @@ fn renderer_escapes_text_and_maps_percentage_units() {
     assert_eq!(
         doc["anti_abuse_bond"]["slash_on_waiting_timeout"].as_bool(),
         Some(false)
+    );
+    assert_eq!(
+        doc["anti_abuse_bond"]["bond_cltv_delta"].as_integer(),
+        Some(432)
     );
     assert_eq!(doc["rpc"]["listen_address"].as_str(), Some("127.0.0.1"));
     assert_eq!(doc["rpc"]["enabled"].as_bool(), Some(false));
@@ -216,6 +229,7 @@ fn fixed_bond_values_follow_the_pinned_template() {
         "payout_max_retries",
         "payout_claim_window_days",
         "maker_bond_payment_timeout_seconds",
+        "bond_cltv_delta",
     ] {
         assert_eq!(
             Some(&rendered["anti_abuse_bond"][key]),
@@ -237,6 +251,13 @@ fn rendered_settings_pass_the_known_startup_checks() {
         .as_integer()
         .unwrap();
     assert!((18..cltv).contains(&margin), "margin {margin}, cltv {cltv}");
+    let bond_cltv = rendered["anti_abuse_bond"]["bond_cltv_delta"]
+        .as_integer()
+        .unwrap();
+    assert!(
+        (cltv + 144..=864).contains(&bond_cltv),
+        "bond_cltv {bond_cltv}, cltv {cltv}"
+    );
     let dev_fee = rendered["mostro"]["dev_fee_percentage"].as_float().unwrap();
     assert!(
         (0.1..=1.0).contains(&dev_fee),

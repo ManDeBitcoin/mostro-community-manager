@@ -42,7 +42,7 @@ export const COMMISSION_BOND_PRESETS: CommissionBondPreset[] = [
   },
 ];
 
-export const POPULAR_CURRENCIES = ['USD', 'EUR', 'ARS', 'VES', 'COP', 'BRL', 'MXN', 'CLP', 'PEN', 'GBP', 'CHF'];
+export const POPULAR_CURRENCIES = ['USD', 'USDT', 'EUR', 'ARS', 'VES', 'COP', 'BRL', 'MXN', 'CLP', 'PEN', 'GBP', 'CHF'];
 
 export const blankConfig = (): Configuration => ({
   community: { name: '', about: '', website: '', picture: '', contact: '', language: 'es' },

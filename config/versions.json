@@ -1,12 +1,12 @@
 {
   "manager": "0.1.0",
   "mostro": {
-    "version": "0.20.1",
-    "tag": "v0.20.1",
+    "version": "0.20.2",
+    "tag": "v0.20.2",
     "repository": "https://github.com/MostroP2P/mostro",
-    "integration_status": "signatures-and-checksums-verified-2026-10-27",
-    "linux_amd64_sha256": "6fbce24e9659bf10b54ecf22aab48f43852e36dfb547cd97777465e328583920",
-    "linux_arm64_sha256": "e0f04e7e876375497ed7634c443957b04ab712a7dc214f11fe1677951f1c75a2"
+    "integration_status": "signatures-and-checksums-verified-2026-11-10",
+    "linux_amd64_sha256": "2d11a6940dd2d76742a903dbe7cfe82325421fdef016721fecf28f54e1d4773d",
+    "linux_arm64_sha256": "bbc62158db39aec5b14f3ea83965394a505e2e09a3bda91714076f9ad585b048"
   },
   "mostro_app_minimum_compatible": null,
   "watchdog": null,

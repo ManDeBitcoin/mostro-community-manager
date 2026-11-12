@@ -144,7 +144,9 @@ publish_mostro_info_interval = 300
 #      present and only falls back to this key otherwise.
 #  (c) Fully removed in Phase 5.
 bitcoin_price_api_url = "https://api.yadio.io"
-# Fiat currencies accepted for orders - leave empty [] to accept all fiat currencies
+# Currencies accepted for orders: ISO 4217 fiat codes, plus the pegged codes
+# of [price.providers.pegged] (stablecoins such as USDT; BTC, LBTC and RBTC,
+# whose amounts are in sats). Leave empty [] to accept every code.
 fiat_currencies_accepted = ['USD', 'EUR', 'ARS', 'CUP']
 # Maximum orders per response in orders action
 max_orders_per_response = 10
@@ -284,6 +286,36 @@ lnd_resynced_clear_after = 300
 # trusted_nodes = [
 #     # hex pubkeys of Mostro nodes you trust to publish accurate rates
 # ]
+#
+# # Pegged currencies as order currencies (docs/PRICE_PROVIDERS.md §11.8,
+# # §11.9). No network call: each code is quoted at 1:1 with what it is
+# # pegged to. Opt-in: off, the node behaves as today (fixed-price orders in
+# # these codes pass where `fiat_currencies_accepted` allows them;
+# # market-priced ones are refused for lack of a rate).
+# #
+# # Stablecoins, pegged to a fiat. `fa` is in whole coins, priced from the
+# # node's rate for that fiat, so a USDT market order is priced like a USD
+# # one. The network goes in the order's payment method ("USDT (Tron)",
+# # "DOC (Rootstock)"); the node does not check it.
+# #   USDT, USDC, DOC -> USD
+# #
+# # Bitcoin on other networks, pegged to bitcoin. `fa` is in SATS of the
+# # asset (fa = 100000 is 0.001 RBTC). At market price the order is `fa`
+# # sats less the premium. The code names the network.
+# #   BTC (on-chain), LBTC (Liquid), RBTC (Rootstock)
+# #
+# # A non-empty `fiat_currencies_accepted` must also list every code you
+# # quote, or every order in it is refused; the node warns at startup.
+# # To accept a code at fixed price only, list it there and leave it out
+# # of `only`.
+# #
+# # `only` picks the codes; without it, every code above is quoted:
+# #   only = ["USDT", "USDC"]          # dollar stablecoins
+# #   only = ["LBTC", "RBTC"]          # Lightning <-> Liquid / Rootstock swaps
+# #   only = ["USDT", "BTC", "RBTC"]   # both kinds
+# [price.providers.pegged]
+# enabled = false
+# # only = ["USDT", "USDC"]
 
 # Anti-abuse bond (issue #711). Opt-in, disabled by default. Uncomment to
 # require a Lightning hold-invoice bond from takers and/or makers. See
@@ -311,6 +343,13 @@ lnd_resynced_clear_after = 300
 # # Seconds a maker has to pay the maker bond (apply_to = "make" | "both").
 # # Past it the unpublished order expires and the maker is told. Must be > 0.
 # maker_bond_payment_timeout_seconds = 900
+# # CLTV delta, in blocks, of the bond hold invoices. A maker bond lasts while
+# # its order rests in the book and then through the trade, so an order rests
+# # in the book for at most bond_cltv_delta - hold_invoice_cltv_delta - 144
+# # blocks (144, ~24 h, with the defaults); a longer expiration is cut to that
+# # when the bond locks. Must be above hold_invoice_cltv_delta + 144 and at
+# # most 864.
+# bond_cltv_delta = 432
 
 # Payment-account history / anti-triangulation (docs/PAYER_HISTORY_ANTI_TRIANGULATION.md).
 # Opt-in, disabled by default. Mostro never sees the buyer's payer details:

@@ -615,7 +615,7 @@ pub fn parse_and_validate_order_event(
                 }
                 "f" => {
                     let f = s[1].to_uppercase();
-                    if f.len() == 3 && f.bytes().all(|b| b.is_ascii_uppercase()) {
+                    if (3..=5).contains(&f.len()) && f.bytes().all(|b| b.is_ascii_uppercase()) {
                         fiat_code = Some(f);
                     }
                 }
@@ -660,7 +660,7 @@ pub fn parse_and_validate_order_event(
     let id = id.ok_or("Falta tag d con UUID")?;
     let kind = kind.ok_or("Falta tag k (buy/sell)")?;
     let status = status.ok_or("Falta tag s con estado")?;
-    let fiat_code = fiat_code.ok_or("Falta tag f con una moneda de tres letras")?;
+    let fiat_code = fiat_code.ok_or("Falta tag f con un código de moneda válido")?;
 
     // NIP-40 expiration check
     if let Some(exp) = expiration_nip40
