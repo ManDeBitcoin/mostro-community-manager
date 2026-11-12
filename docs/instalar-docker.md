@@ -23,7 +23,7 @@ LND y Bitcoin Core no se tocan.
 La instalación es un clon del repositorio en una versión publicada. Así `actualizar.sh` puede cambiarla por la siguiente.
 
 ```bash
-git clone --branch v1.0.16 https://github.com/ManDeBitcoin/mostro-community-manager.git mostro-manager
+git clone --branch v1.0.17 https://github.com/ManDeBitcoin/mostro-community-manager.git mostro-manager
 ```
 
 ```bash

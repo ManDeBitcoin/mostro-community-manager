@@ -30,7 +30,7 @@ Las imágenes van fijadas por digest. Todos los contenedores corren como el usua
 El nodo va en su propio clon del repositorio, aparte del del Manager. Así, cuando el Manager cambia de versión, los archivos del nodo no cambian.
 
 ```bash
-git clone --branch v1.0.16 https://github.com/ManDeBitcoin/mostro-community-manager.git nodo-bitcoin
+git clone --branch v1.0.17 https://github.com/ManDeBitcoin/mostro-community-manager.git nodo-bitcoin
 ```
 
 ```bash
@@ -87,7 +87,7 @@ LND está listo cuando `synced_to_chain` es `true`. El Manager se puede instalar
 Sigue [Docker junto a tu LND](instalar-docker.md) en otro clon. En el paso de preparar, en lugar de `--lnd`, dale la carpeta del nodo:
 
 ```bash
-git clone --branch v1.0.16 https://github.com/ManDeBitcoin/mostro-community-manager.git mostro-manager
+git clone --branch v1.0.17 https://github.com/ManDeBitcoin/mostro-community-manager.git mostro-manager
 ```
 
 ```bash
